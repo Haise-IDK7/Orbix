@@ -21,6 +21,9 @@ We extend our deep gratitude to Sehajveer Singh and all contributors to the orig
 - **Apps View**: Full launcher search across installed desktop apps, Store packages, and indexed files/folders with quick dock pinning.
 - **Media View**: User-attached media application shortcuts, multi-session GSMTC controller, and playback switcher.
 
+### Third-Party Services
+- **[LRCLIB](https://lrclib.net)**: Free, community-maintained lyrics database used by the live lyrics panel. Lyrics are fetched on demand for the playing track and are not bundled with Orbix.
+
 ### Contributors & Maintainers
 - **Orbix Contributors**
 - Copyright (C) 2026 Orbix Contributors

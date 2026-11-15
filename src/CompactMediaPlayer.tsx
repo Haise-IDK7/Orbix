@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
+import { MicVocal } from "lucide-react";
 import { Visualizer } from "./App";
 import {
 	PlayIcon,
@@ -43,6 +44,8 @@ interface CompactMediaPlayerProps {
 	onAnimatePrev: () => void;
 	onAnimateNext: () => void;
 	onLayoutChange: (layout: "classic" | "compact") => void;
+	lyricsOpen: boolean;
+	onToggleLyrics: () => void;
 }
 
 const MARQUEE_SPEED = 30;
@@ -125,7 +128,9 @@ export function CompactMediaPlayer({
 	nextBack,
 	onAnimatePrev,
 	onAnimateNext,
-	onLayoutChange
+	onLayoutChange,
+	lyricsOpen,
+	onToggleLyrics
 }: CompactMediaPlayerProps) {
 	const seekRef = useRef<HTMLInputElement>(null);
 
@@ -231,6 +236,17 @@ export function CompactMediaPlayer({
 				<div className="cmp-visualizer">
 					<Visualizer isPlaying={isPlaying} bars={5} height={16} />
 				</div>
+				<button
+					type="button"
+					className={`lyrics-toggle-btn ${lyricsOpen ? "active" : ""}`}
+					onClick={(e) => {
+						e.stopPropagation();
+						onToggleLyrics();
+					}}
+					title={lyricsOpen ? "Hide lyrics" : "Show lyrics"}
+				>
+					<MicVocal size={15} />
+				</button>
 			</div>
 
 			{/* Row 2: Progress bar */}

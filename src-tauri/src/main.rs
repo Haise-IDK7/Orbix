@@ -2,6 +2,9 @@
 
 mod commands;
 mod dock_extras;
+mod glass;
+mod lyrics;
+mod memory;
 mod power;
 mod services;
 mod shelf;
@@ -11,6 +14,7 @@ mod types;
 mod updater;
 mod utils;
 mod wallpaper;
+mod wifi;
 
 use std::sync::atomic::Ordering;
 use tauri::Manager;
@@ -167,6 +171,7 @@ fn main() {
             get_internet_status,
             get_available_wifi_networks,
             connect_wifi_network,
+            open_location_settings,
             get_microphone_state,
             toggle_microphone_mute,
             trigger_screen_snip,
@@ -217,7 +222,12 @@ fn main() {
             wallpaper::get_wallpapers,
             wallpaper::wallpaper_thumbnail,
             wallpaper::set_wallpaper,
-            search_user_files
+            search_user_files,
+            memory::get_memory_report,
+            memory::optimize_memory,
+            memory::close_heavy_app,
+            lyrics::fetch_lyrics,
+            glass::get_glass_backdrop
         ])
         .setup(|app| {
             init_taskbar_marker(app.handle());

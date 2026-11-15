@@ -124,6 +124,8 @@ pub struct WifiNetworkEntry {
     pub signal_percent: u8,
     pub is_secure: bool,
     pub is_connected: bool,
+    /// Windows already has a saved profile, so no password prompt is needed.
+    pub has_profile: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

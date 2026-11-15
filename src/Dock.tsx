@@ -5,6 +5,8 @@ import { listen } from "@tauri-apps/api/event";
 import "./Dock.css";
 import { initTheme } from "./theme";
 import { useSettingsSync } from "./hooks/useSettingsSync";
+import { useGlassBackdrop } from "./hooks/useGlassBackdrop";
+import { GlassLayer } from "./components/glass/GlassLayer";
 import { reloadIfMirrorWasStale } from "./hooks/settingsMirror";
 
 import { mergeTrayApps, selectDockTrayApps, type AppInfo, type TrayApp } from "./dockApps";
@@ -33,6 +35,9 @@ export function appIdentity(p: string, executable?: string, name?: string) {
 }
 
 const itemKey = (app: AppInfo) => appIdentity(app.path, app.executable, app.name);
+
+const AUTO_PIN_FLAG = "bloom-autopin-whatsapp-spotify";
+const AUTO_PIN_NAMES = [/^whatsapp$/i, /^spotify$/i];
 
 // Fuzzy identity: a running window and its installed/pinned entry often carry
 // different paths (exe vs .lnk vs AUMID), so exact keys miss and the same app
@@ -152,6 +157,8 @@ const Dock = memo(function Dock() {
 	const [dockAdaptive, setDockAdaptive] = useState(
 		() => localStorage.getItem("bloom-dock-adaptive") === "true"
 	);
+	const [glassStyle, setGlassStyle] = useState(() => localStorage.getItem("bloom-glass-style") !== "false");
+	useGlassBackdrop(glassStyle);
 	const [startIcon, setStartIcon] = useState(
 		() => localStorage.getItem("bloom-start-icon") || "default"
 	);
@@ -362,6 +369,8 @@ const Dock = memo(function Dock() {
 			const separator = getVal("bloom-dock-separator-enabled", "true");
 			setDockSeparatorEnabled(separator === "true");
 
+			setGlassStyle(getVal("bloom-glass-style", "true") !== "false");
+
 			const adaptive = getVal("bloom-dock-adaptive", "false");
 			setDockAdaptive(adaptive === "true");
 
@@ -374,13 +383,13 @@ const Dock = memo(function Dock() {
 			const scaleVal = getVal("bloom-dock-scale") ?? getVal("bloom-scale");
 			if (scaleVal !== null) setScale(parseFloat(scaleVal));
 
-			const pinned = await invoke<AppInfo[]>("load_pinned_apps");
-			setPinnedApps(pinned.map((a) => ({ ...a, is_pinned: true })));
+			const pinned = (await invoke<AppInfo[]>("load_pinned_apps")).map((a) => ({ ...a, is_pinned: true }));
+			setPinnedApps(pinned);
 			pinned.forEach((app) => fetchIcon(app.path));
 
-			// Warm the installed-apps cache in the background so the add-app
-			// popup opens with data ready instead of waiting on the scan.
-			invoke<AppInfo[]>("get_installed_apps").catch(() => {});
+			// Also warms the installed-apps cache so the add-app popup opens
+			// with data ready instead of waiting on the scan.
+			void autoPinDefaultApps(pinned);
 
 			// Load custom icons
 			try {
@@ -420,6 +429,7 @@ const Dock = memo(function Dock() {
 		"bloom-dock-icon-only": setDockIconOnly,
 		"bloom-dock-separator-enabled": setDockSeparatorEnabled,
 		"bloom-dock-adaptive": setDockAdaptive,
+		"bloom-glass-style": setGlassStyle,
 		"bloom-start-icon": setStartIcon,
 		"bloom-dock-scale": setScale,
 		"bloom-scale": (value: any) => {
@@ -661,6 +671,23 @@ const Dock = memo(function Dock() {
 		e.preventDefault();
 		e.stopPropagation();
 		handleNewInstance(app);
+	};
+
+	// WhatsApp and Spotify usually live in the notification area, and unpinned
+	// tray apps only appear in the dock while a window is open. Pin them once
+	// (if installed) so they always show; the user can unpin them as usual.
+	const autoPinDefaultApps = async (current: AppInfo[]) => {
+		const installed = await invoke<AppInfo[]>("get_installed_apps").catch(() => [] as AppInfo[]);
+		if (localStorage.getItem(AUTO_PIN_FLAG) === "done" || installed.length === 0) return;
+		const additions = AUTO_PIN_NAMES.map((pattern) => installed.find((app) => pattern.test(app.name.trim())))
+			.filter((app): app is AppInfo => !!app && !current.some((pinnedApp) => isSameApp(pinnedApp, app)))
+			.map((app) => ({ ...app, is_pinned: true, is_running: false, hwnd: undefined }));
+		localStorage.setItem(AUTO_PIN_FLAG, "done");
+		if (additions.length === 0) return;
+		const next = [...current, ...additions];
+		setPinnedApps(next);
+		additions.forEach((app) => fetchIcon(app.path, app.name));
+		await invoke("save_pinned_apps", { apps: next }).catch(console.error);
 	};
 
 	const togglePin = async (app: AppInfo) => {
@@ -1109,7 +1136,7 @@ const Dock = memo(function Dock() {
 				<motion.div
 					ref={dockRef}
 					layout
-					className={`dock ${isExpanded && !isHidden ? "dock-expanded" : ""} ${isImpacted && !isExpanded && !isHidden ? "dock-impacted" : ""} ${dockIconOnly ? "dock-icon-only" : ""} ${isAdaptive ? "dock-adaptive" : ""}`}
+					className={`dock ${isExpanded && !isHidden ? "dock-expanded" : ""} ${isImpacted && !isExpanded && !isHidden ? "dock-impacted" : ""} ${dockIconOnly ? "dock-icon-only" : ""} ${isAdaptive ? "dock-adaptive" : ""} ${glassStyle ? "glass" : ""}`}
 					onMouseEnter={() => setIsDockHovered(true)}
 					onMouseLeave={() => {
 						setIsDockHovered(false);
@@ -1153,6 +1180,7 @@ const Dock = memo(function Dock() {
 					style={{ originX: 0.5, originY: 1, minWidth: 34 }}
 					onContextMenu={(e) => handleContextMenu(e, null)}
 				>
+					{glassStyle && <GlassLayer anchor="bottom" scale={scale} />}
 					<AnimatePresence>
 						{isExpanded && (
 							<motion.div

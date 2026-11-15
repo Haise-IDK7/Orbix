@@ -1338,6 +1338,18 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                                 .duration_since(std::time::UNIX_EPOCH)
                                                 .map(|d| d.as_millis() as u64)
                                                 .unwrap_or(0);
+                                            // Players only refresh the timeline on
+                                            // play/pause/seek, so `position_ms` is the
+                                            // position at LastUpdatedTime, not now. Pair
+                                            // it with that moment so the UI extrapolates
+                                            // correctly (needed for synced lyrics).
+                                            let position_updated_at = session
+                                                .GetTimelineProperties()
+                                                .and_then(|t| t.LastUpdatedTime())
+                                                .ok()
+                                                .and_then(|t| filetime_to_unix_ms(t.UniversalTime))
+                                                .filter(|&ms| ms <= now_ms && now_ms - ms < 6 * 60 * 60 * 1000)
+                                                .unwrap_or(now_ms);
                                             let info = MediaInfo {
                                                 title,
                                                 artist,
@@ -1347,7 +1359,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                                 position_ms,
                                                 duration_ms,
                                                 seek_enabled,
-                                                position_updated_at: now_ms,
+                                                position_updated_at,
                                             };
                                             if is_playing {
                                                 best_info = Some(info);
@@ -4132,11 +4144,29 @@ fn recover_from_webview_failure(handle: &AppHandle) {
     });
 }
 
+/// Windows FILETIME-based `DateTime` (100 ns ticks since 1601) → Unix ms.
+fn filetime_to_unix_ms(ticks: i64) -> Option<u64> {
+    const UNIX_EPOCH_TICKS: i64 = 116_444_736_000_000_000;
+    let ms = (ticks - UNIX_EPOCH_TICKS) / 10_000;
+    (ms > 0).then_some(ms as u64)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        is_helper_name, is_launchable_entry, notch_mode_reserves_work_area, win_number_index,
+        filetime_to_unix_ms, is_helper_name, is_launchable_entry, notch_mode_reserves_work_area,
+        win_number_index,
     };
+
+    #[test]
+    fn converts_filetime_to_unix_ms() {
+        // 2024-01-01T00:00:00Z
+        assert_eq!(
+            filetime_to_unix_ms(133_485_408_000_000_000),
+            Some(1_704_067_200_000)
+        );
+        assert_eq!(filetime_to_unix_ms(0), None);
+    }
 
     #[test]
     fn win_number_maps_top_row_digits_only() {

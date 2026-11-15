@@ -6,6 +6,7 @@ import { SplitPillCard } from "./SplitPillCard";
 import { QuickActionGrid } from "./QuickActionGrid";
 import { ControlsFooter } from "./ControlsFooter";
 import { WifiSubView } from "./WifiSubView";
+import { PerformanceSubView } from "./PerformanceSubView";
 import { BluetoothSubView } from "./BluetoothSubView";
 import { InternetStatus, MicrophoneState, SubViewMode } from "./types";
 import "./ControlsView.css";
@@ -365,6 +366,7 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 							onRestartShell={handleRestartShell}
 							onOpenSettings={onOpenSettings}
 							onOpenNetworkSettings={handleOpenNetworkSettings}
+							onOpenPerformance={() => updateSubView("performance")}
 						/>
 					</motion.div>
 				) : subView === "wifi" ? (
@@ -382,6 +384,17 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 							onBack={() => updateSubView("main")}
 							currentSsid={internetStatus?.connection_type === "wifi" ? internetStatus.label : undefined}
 						/>
+					</motion.div>
+				) : subView === "performance" ? (
+					<motion.div
+						key="cc-perf"
+						className="cc-view-page"
+						initial={{ opacity: 0, x: 30 }}
+						animate={{ opacity: 1, x: 0 }}
+						exit={{ opacity: 0, x: 30 }}
+						transition={{ duration: 0.18, ease: "easeOut" }}
+					>
+						<PerformanceSubView onBack={() => updateSubView("main")} />
 					</motion.div>
 				) : (
 					<motion.div

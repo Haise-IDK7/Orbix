@@ -153,6 +153,8 @@ function SettingsApp() {
 							handleBrightnessChange={settings.handleBrightnessChange}
 							cornersEnabled={settings.cornersEnabled}
 							toggleCorners={settings.toggleCorners}
+							glassStyle={settings.glassStyle}
+							toggleGlassStyle={settings.toggleGlassStyle}
 							scale={settings.scale}
 							handleScaleChange={settings.handleScaleChange}
 							notchScale={settings.notchScale}

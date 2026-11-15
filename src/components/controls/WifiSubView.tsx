@@ -4,6 +4,9 @@ import { ChevronLeft, RotateCw, Lock, Check } from "lucide-react";
 import { SignalBarsIcon } from "./Icons";
 import { WifiNetworkEntry } from "./types";
 
+// Must match wifi::LOCATION_PERMISSION_ERROR in src-tauri/src/wifi.rs.
+const LOCATION_PERMISSION_ERROR = "LOCATION_PERMISSION_REQUIRED";
+
 interface WifiSubViewProps {
 	wifiEnabled: boolean;
 	onToggleWifi: () => void;
@@ -23,6 +26,7 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 	const [password, setPassword] = useState("");
 	const [connecting, setConnecting] = useState(false);
 	const [connectError, setConnectError] = useState<string | null>(null);
+	const [scanError, setScanError] = useState<string | null>(null);
 
 	const scanNetworks = useCallback(async () => {
 		if (!wifiEnabled) return;
@@ -30,8 +34,11 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 		try {
 			const list = await invoke<WifiNetworkEntry[]>("get_available_wifi_networks");
 			setNetworks(list);
+			setScanError(null);
 		} catch (err) {
 			console.error("Failed to scan wifi:", err);
+			setNetworks([]);
+			setScanError(String(err));
 		} finally {
 			setLoading(false);
 		}
@@ -55,10 +62,14 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 				// Refresh status
 				setTimeout(() => scanNetworks(), 1500);
 			} else {
-				setConnectError("Could not connect to network");
+				// Saved networks connect without opening the box; open it so the
+				// error and a password field are visible.
+				setSelectedSsid(ssid);
+				setConnectError("Could not connect. Check the password and try again.");
 			}
-		} catch (err: any) {
-			setConnectError(err?.message || "Failed to connect");
+		} catch (err) {
+			setSelectedSsid(ssid);
+			setConnectError(String(err) || "Failed to connect");
 		} finally {
 			setConnecting(false);
 		}
@@ -127,9 +138,37 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 						<RotateCw size={18} className="spinning" />
 						<span>Scanning nearby networks...</span>
 					</div>
+				) : scanError === LOCATION_PERMISSION_ERROR ? (
+					<div className="cc-subview-empty">
+						<p>
+							Windows hides nearby networks from apps
+							<br />
+							while location access is off.
+						</p>
+						<button
+							type="button"
+							className="cc-subview-primary-btn"
+							onClick={(e) => {
+								e.stopPropagation();
+								invoke("open_location_settings").catch(console.error);
+							}}
+						>
+							Open location settings
+						</button>
+						<button
+							type="button"
+							className="cc-subview-ghost-btn"
+							onClick={(e) => {
+								e.stopPropagation();
+								scanNetworks();
+							}}
+						>
+							Scan Again
+						</button>
+					</div>
 				) : networks.length === 0 ? (
 					<div className="cc-subview-empty">
-						<p>No Wi-Fi networks found</p>
+						<p>{scanError ?? "No Wi-Fi networks found"}</p>
 						<button
 							type="button"
 							className="cc-subview-ghost-btn"
@@ -187,7 +226,7 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 												className="cc-network-connect-btn"
 												onClick={(e) => {
 													e.stopPropagation();
-													if (!net.is_secure) {
+													if (!net.is_secure || net.has_profile) {
 														handleConnect(net.ssid);
 													} else {
 														setSelectedSsid(isSelected ? null : net.ssid);

@@ -830,3 +830,145 @@
 	background: rgba(255, 255, 255, 0.1);
 	border-color: rgba(255, 255, 255, 0.14);
 }
+
+/* ── Performance sub-view ─────────────────────────────────────────────── */
+.cc-perf-card {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.06);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cc-perf-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	font-size: 12px;
+}
+
+.cc-perf-label {
+	color: #94a3b8;
+}
+
+.cc-perf-value {
+	color: #f8fafc;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+.cc-perf-bar {
+	height: 6px;
+	border-radius: 3px;
+	background: rgba(255, 255, 255, 0.1);
+	overflow: hidden;
+}
+
+.cc-perf-bar-fill {
+	height: 100%;
+	border-radius: 3px;
+	transition: width 0.4s ease;
+}
+
+.cc-perf-bar-fill.low {
+	background: #34d399;
+}
+
+.cc-perf-bar-fill.medium {
+	background: #fbbf24;
+}
+
+.cc-perf-bar-fill.high {
+	background: #f87171;
+}
+
+.cc-perf-optimize {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	align-self: stretch;
+	padding: 7px 12px;
+}
+
+.cc-perf-optimize:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+.cc-perf-message {
+	font-size: 11px;
+	color: #cbd5e1;
+	white-space: normal;
+	text-align: center;
+}
+
+.cc-perf-section-title {
+	display: block;
+	margin: 10px 2px 6px;
+	font-size: 11px;
+	color: #94a3b8;
+}
+
+.cc-perf-apps {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.cc-perf-app-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 10px;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.cc-perf-app-info {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.cc-perf-app-name {
+	font-size: 12px;
+	color: #f8fafc;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.cc-perf-app-meta {
+	font-size: 10.5px;
+	color: #94a3b8;
+}
+
+.cc-perf-close-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	height: 24px;
+	padding: 0 6px;
+	border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: rgba(255, 255, 255, 0.06);
+	color: #e2e8f0;
+	font-size: 11px;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.cc-perf-close-btn:hover {
+	background: rgba(248, 113, 113, 0.18);
+	border-color: rgba(248, 113, 113, 0.4);
+}
+
+.cc-perf-close-btn.force {
+	background: rgba(248, 113, 113, 0.22);
+	border-color: rgba(248, 113, 113, 0.5);
+	color: #fecaca;
+}

@@ -1,5 +1,5 @@
 import React from "react";
-import { Mic, MicOff, RotateCw, Settings, Wifi } from "lucide-react";
+import { Gauge, Mic, MicOff, RotateCw, Settings, Wifi } from "lucide-react";
 import { EthernetIcon, GlobeOffIcon } from "./Icons";
 import { InternetStatus, MicrophoneState } from "./types";
 
@@ -12,6 +12,7 @@ interface ControlsFooterProps {
 	onRestartShell: () => void;
 	onOpenSettings: () => void;
 	onOpenNetworkSettings: () => void;
+	onOpenPerformance: () => void;
 }
 
 export const ControlsFooter: React.FC<ControlsFooterProps> = React.memo(({
@@ -23,6 +24,7 @@ export const ControlsFooter: React.FC<ControlsFooterProps> = React.memo(({
 	onRestartShell,
 	onOpenSettings,
 	onOpenNetworkSettings,
+	onOpenPerformance,
 }) => {
 	const connType = internetStatus?.connection_type ?? (internetStatus?.is_connected ? "wifi" : "offline");
 	const isConnected = internetStatus?.is_connected ?? false;
@@ -86,6 +88,18 @@ export const ControlsFooter: React.FC<ControlsFooterProps> = React.memo(({
 
 			{/* Right Side: Shell Controls */}
 			<div className="cc-footer-actions">
+				<button
+					type="button"
+					className="cc-footer-icon-btn"
+					onClick={(e) => {
+						e.stopPropagation();
+						onOpenPerformance();
+					}}
+					title="Performance • Free up RAM"
+				>
+					<Gauge size={13} />
+				</button>
+
 				<button
 					type="button"
 					className="cc-footer-icon-btn"

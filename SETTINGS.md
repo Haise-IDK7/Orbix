@@ -113,6 +113,7 @@ Edit `settings.json` with any text editor while Orbix is running. Changes are ap
 | `bloom-theme-saturation` | float string                                     | `"0.50"`    | Color saturation for custom/adaptive themes (0.0 to 1.0).                                                                                                   |
 | `bloom-theme-brightness` | float string                                     | `"0.15"`    | Background brightness for custom/adaptive themes (0.0 to 1.0).                                                                                              |
 | `bloom-corners-enabled`  | `"true"` / `"false"`                             | `"false"`   | Render rounded screen corner overlays on top edges.                                                                                                         |
+| `bloom-glass-style`      | `"true"` / `"false"`                             | `"true"`    | Frosted "crystal" background for the notch and dock (blurred wallpaper + tint).                                                                            |
 
 ### Status Widgets
 

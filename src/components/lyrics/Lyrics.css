@@ -1,0 +1,172 @@
+/* ── Lyrics panel (expanded music notch) ─────────────────────────────── */
+.lyrics-panel {
+	position: relative;
+	width: 100%;
+	flex-shrink: 0;
+	overflow: hidden;
+	box-sizing: border-box;
+	padding: 0 6px;
+	white-space: normal;
+	-webkit-mask-image: linear-gradient(
+		to bottom,
+		transparent 0,
+		#000 22%,
+		#000 72%,
+		transparent 100%
+	);
+	mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 72%, transparent 100%);
+}
+
+.lyrics-track {
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
+	transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+	will-change: transform;
+}
+
+.lyrics-line {
+	font-size: 15px;
+	font-weight: 700;
+	line-height: 1.25;
+	letter-spacing: -0.01em;
+	color: rgba(255, 255, 255, 0.36);
+	transform-origin: left center;
+	transition:
+		color 0.35s ease,
+		filter 0.35s ease,
+		transform 0.35s ease;
+}
+
+.lyrics-line.past {
+	color: rgba(255, 255, 255, 0.26);
+}
+
+.lyrics-line.active {
+	color: #fff;
+	transform: scale(1.03);
+	text-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
+}
+
+.lyrics-line.seekable {
+	cursor: pointer;
+}
+
+.lyrics-line.seekable:not(.active):hover {
+	color: rgba(255, 255, 255, 0.7);
+	filter: none !important;
+}
+
+.lyrics-panel.plain {
+	overflow-y: auto;
+	-webkit-mask-image: none;
+	mask-image: none;
+	scrollbar-width: none;
+}
+
+.lyrics-panel.plain::-webkit-scrollbar {
+	display: none;
+}
+
+.lyrics-plain-note {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: rgba(255, 255, 255, 0.4);
+	margin: 2px 0 6px;
+}
+
+.lyrics-plain-line {
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.45;
+	color: rgba(255, 255, 255, 0.82);
+}
+
+.lyrics-panel.status {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	-webkit-mask-image: none;
+	mask-image: none;
+}
+
+.lyrics-status {
+	font-size: 12px;
+	color: rgba(255, 255, 255, 0.55);
+}
+
+.lyrics-status.pulsing {
+	animation: lyrics-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes lyrics-pulse {
+	50% {
+		opacity: 0.4;
+	}
+}
+
+/* Toggle button shared by both media layouts */
+.lyrics-toggle-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	border-radius: 8px;
+	border: none;
+	background: transparent;
+	color: rgba(255, 255, 255, 0.5);
+	cursor: pointer;
+	flex-shrink: 0;
+	transition:
+		background 0.2s ease,
+		color 0.2s ease;
+}
+
+.lyrics-toggle-btn:hover {
+	color: rgba(255, 255, 255, 0.85);
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.lyrics-toggle-btn.active {
+	color: #fff;
+	background: rgba(255, 255, 255, 0.16);
+}
+
+/* ── Current line under the collapsed notch ──────────────────────────── */
+.lyrics-ticker {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	padding: 0 14px 4px;
+	box-sizing: border-box;
+	overflow: hidden;
+	flex-shrink: 0;
+}
+
+.lyrics-ticker-text {
+	display: block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.92);
+}
+
+/* Player + lyrics stacked inside the expanded music notch */
+.expanded-music-container.with-lyrics {
+	flex-direction: column;
+	gap: 6px;
+}
+
+.music-player-slot {
+	display: flex;
+	align-items: stretch;
+	flex: 1;
+	min-height: 0;
+	width: 100%;
+}

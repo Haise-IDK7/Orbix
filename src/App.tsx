@@ -18,6 +18,11 @@ import {
 	HeadphonesIcon
 } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
+import { LyricsPanel, LYRICS_PANEL_HEIGHT } from "./components/lyrics/LyricsPanel";
+import { LyricsTicker, LYRICS_TICKER_HEIGHT } from "./components/lyrics/LyricsTicker";
+import { useActiveLyricIndex, useLyrics } from "./hooks/useLyrics";
+import { GlassLayer } from "./components/glass/GlassLayer";
+import { useGlassBackdrop } from "./hooks/useGlassBackdrop";
 import { PowerView } from "./components/power/PowerView";
 import { WallpaperView } from "./components/wallpaper/WallpaperView";
 import { AppsView } from "./components/apps/AppsView";
@@ -49,7 +54,8 @@ import {
 	Headphones,
 	Mic,
 	Zap,
-	Moon
+	Moon,
+	MicVocal
 } from "lucide-react";
 
 // Pomodoro timer limit.
@@ -870,10 +876,36 @@ function App() {
 	const [settingsCornersEnabled, setSettingsCornersEnabled] = useState(
 		() => localStorage.getItem("bloom-corners-enabled") === "true"
 	);
+	const [settingsGlassStyle, setSettingsGlassStyle] = useState(
+		() => localStorage.getItem("bloom-glass-style") !== "false"
+	);
+	useGlassBackdrop(settingsGlassStyle);
 	const [mediaLayout, setMediaLayout] = useState<"classic" | "compact">(
 		() => (localStorage.getItem("bloom-media-layout") as "classic" | "compact") || "classic"
 	);
 	const [compactVolumeExpanded, setCompactVolumeExpanded] = useState(false);
+
+	// Live lyrics: the toggle is remembered, and while on, the current line also
+	// shows under the collapsed notch.
+	const [lyricsOpen, setLyricsOpen] = useState(() => localStorage.getItem("bloom-lyrics-open") === "true");
+	const toggleLyrics = useCallback(() => {
+		setLyricsOpen((open) => {
+			localStorage.setItem("bloom-lyrics-open", String(!open));
+			return !open;
+		});
+	}, []);
+	const lyrics = useLyrics(
+		lyricsOpen && mediaInfo.has_media,
+		mediaInfo.title,
+		mediaInfo.artist,
+		mediaInfo.duration_ms ?? 0
+	);
+	const activeLyricIndex = useActiveLyricIndex(lyrics.lines, {
+		positionMs: mediaInfo.position_ms ?? 0,
+		updatedAt: mediaInfo.position_updated_at ?? 0,
+		isPlaying
+	});
+	const activeLyricText = activeLyricIndex >= 0 ? lyrics.lines[activeLyricIndex]?.text || "♪" : null;
 
 	// Weather hook
 	const {
@@ -916,6 +948,7 @@ function App() {
 					getVal("bloom-media-compact-glow-enabled", "true") !== "false"
 				);
 				setSettingsCornersEnabled(getVal("bloom-corners-enabled", "false") === "true");
+				setSettingsGlassStyle(getVal("bloom-glass-style", "true") !== "false");
 				setNotchControlSavings(getVal("bloom-notch-control-savings", "true") !== "false");
 				setNotchControlDnd(getVal("bloom-notch-control-dnd", "true") !== "false");
 				setNotchControlAirplane(getVal("bloom-notch-control-airplane", "true") !== "false");
@@ -1077,6 +1110,7 @@ function App() {
 			"bloom-media-compact-glow-enabled": setSettingsCompactGlowEnabled,
 			"bloom-media-layout": setMediaLayout,
 			"bloom-corners-enabled": setSettingsCornersEnabled,
+			"bloom-glass-style": setSettingsGlassStyle,
 			"bloom-notch-scale": setScale,
 			"bloom-scale": (value: any) => {
 				if (localStorage.getItem("bloom-notch-scale") === null) {
@@ -2529,6 +2563,13 @@ function App() {
 
 	// Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
 	const isMusicMode = mediaInfo.has_media && bloomMode === "music" && settingsMusicModeEnabled;
+	const showLyricsPanel = lyricsOpen && bloomMode === "music" && isHovered;
+	const showLyricsTicker =
+		lyricsOpen &&
+		!isHovered &&
+		isPlaying &&
+		activeLyricText !== null &&
+		(bloomMode === "status" || bloomMode === "music");
 
 	// Calculate width dynamically based on enabled features
 	const getDynamicWidth = () => {
@@ -2550,6 +2591,7 @@ function App() {
 			return Math.max(mediaWidth, widgetsWidth);
 		}
 		if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse || !!audioToast) && !isHovered) return 260;
+		if (showLyricsTicker) return 340;
 
 		let w = 140;
 		return w;
@@ -2568,16 +2610,20 @@ function App() {
 		// Shelf expands on mode alone (no hover needed — there is no cursor
 		// hover during an OS drag) and is sized to exactly one row of tiles.
 		if (bloomMode === "shelf") return shelfItems.length > 0 ? 176 : 130;
-		if (bloomMode === "command-center") return isHovered ? (ccSubView === "wifi" ? 400 : ccSubView === "bluetooth" ? 360 : 332) : 36;
+		if (bloomMode === "command-center") return isHovered ? (ccSubView === "wifi" || ccSubView === "performance" ? 400 : ccSubView === "bluetooth" ? 360 : 332) : 36;
 		if (bloomMode === "apps") return isHovered ? 400 : 36;
 		if (bloomMode === "power") return isHovered ? 124 : 36;
 		if (bloomMode === "wallpaper") return 320;
+		if (showLyricsTicker) return 36 + LYRICS_TICKER_HEIGHT;
 		if (bloomMode === "status") return 36;
 		if (bloomMode === "music" && isHovered) {
 			const hasProgressBar = (mediaInfo.duration_ms ?? 0) > 0;
 			let h = mediaLayout === "compact" ? (hasProgressBar ? 150 : 126) : 128;
 			if (mediaLayout === "compact" && compactVolumeExpanded) {
 				h += 38;
+			}
+			if (showLyricsPanel) {
+				h += LYRICS_PANEL_HEIGHT + 6;
 			}
 			return 36 + h;
 		}
@@ -2629,7 +2675,7 @@ function App() {
 			<div style={{ zoom: scale, width: "100%", display: "flex", justifyContent: "center" }}>
 				<motion.div
 					ref={bloomRef}
-					className={`bloom ${isHovered ? "expanded" : ""} ${isImpacted ? "is-impacted" : ""} ${isDragHovering ? "drag-hover" : ""} ${bloomMode === "apps" ? "apps-mode" : ""} ${isCalendarMode ? "calendar-mode" : ""}`}
+					className={`bloom ${isHovered ? "expanded" : ""} ${isImpacted ? "is-impacted" : ""} ${isDragHovering ? "drag-hover" : ""} ${bloomMode === "apps" ? "apps-mode" : ""} ${isCalendarMode ? "calendar-mode" : ""} ${settingsGlassStyle ? "glass" : ""}`}
 					onMouseEnter={() => {
 						cancelNotchClose();
 						setIsNotchHovered(true);
@@ -2720,6 +2766,7 @@ function App() {
 						default: { type: "spring", stiffness: 500, damping: 30, mass: 1 }
 					}}
 				>
+					{settingsGlassStyle && <GlassLayer anchor="top" scale={scale} />}
 					<AnimatePresence>
 						{isMusicMode &&
 							settingsAmbienceEnabled &&
@@ -2960,20 +3007,27 @@ function App() {
 											</div>
 										</motion.div>
 
+								{showLyricsTicker && activeLyricText !== null && (
+									<LyricsTicker text={activeLyricText} lineKey={activeLyricIndex} />
+								)}
+
 								{/* Media Player Panel */}
 								<AnimatePresence>
 									{bloomMode === "music" && isHovered && (
 										<motion.div
 											key="expanded-music"
-											className="expanded-music-container"
+											className={`expanded-music-container ${showLyricsPanel ? "with-lyrics" : ""}`}
 											initial={{ opacity: 0, scale: 0.98 }}
 											animate={{ opacity: 1, scale: 1 }}
 											exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
 											transition={{ type: "spring", stiffness: 500, damping: 30 }}
 											onClick={(e) => e.stopPropagation()}
 										>
+											<div className="music-player-slot">
 											{mediaLayout === "compact" ? (
 												<CompactMediaPlayer
+													lyricsOpen={lyricsOpen}
+													onToggleLyrics={toggleLyrics}
 													mediaInfo={mediaInfo}
 													albumArtUrl={albumArtUrl}
 													albumArtKey={albumArtKey}
@@ -3074,6 +3128,17 @@ function App() {
 																		<Visualizer isPlaying={isPlaying} bars={5} height={18} />
 																	)}
 																</div>
+																<button
+																	type="button"
+																	className={`lyrics-toggle-btn ${lyricsOpen ? "active" : ""}`}
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		toggleLyrics();
+																	}}
+																	title={lyricsOpen ? "Hide lyrics" : "Show lyrics"}
+																>
+																	<MicVocal size={15} />
+																</button>
 																<motion.button
 																	className="classic-audio-output-btn"
 																	onClick={(e) => {
@@ -3231,6 +3296,17 @@ function App() {
 														</div>
 													</div>
 												</div>
+											)}
+											</div>
+											{showLyricsPanel && (
+												<LyricsPanel
+													state={lyrics}
+													activeIndex={activeLyricIndex}
+													canSeek={mediaInfo.seek_enabled ?? false}
+													onSeek={(positionMs) => {
+														invoke("media_seek", { positionMs }).catch(() => {});
+													}}
+												/>
 											)}
 										</motion.div>
 									)}

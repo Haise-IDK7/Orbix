@@ -1162,7 +1162,7 @@ fn find_aumid_by_family(family: &str) -> Option<String> {
             }
             let enum_id = enum_id?;
 
-            let prefix = format!("{}!", family);
+            let prefix = format!("{}!", family.to_lowercase());
             let mut pidl_buf: [*mut windows::Win32::UI::Shell::Common::ITEMIDLIST; 1] =
                 [std::ptr::null_mut()];
             let mut fetched = 0;
@@ -1185,8 +1185,11 @@ fn find_aumid_by_family(family: &str) -> Option<String> {
                 {
                     let s = String::from_utf16_lossy(windows::core::PCWSTR(p_ptr.0).as_wide());
                     CoTaskMemFree(Some(p_ptr.0 as *const _));
-                    if s.starts_with(&prefix) {
-                        found = Some(s);
+                    // Parsing names are normally the bare AUMID; take the last
+                    // segment in case the shell prefixes the AppsFolder path.
+                    let id = s.rsplit('\\').next().unwrap_or(&s);
+                    if id.to_lowercase().starts_with(&prefix) {
+                        found = Some(id.to_string());
                     }
                 }
                 ILFree(Some(absolute_pidl as *const _));
@@ -1206,8 +1209,12 @@ fn find_aumid_by_family(family: &str) -> Option<String> {
 /// Those exes carry no app icon; the package manifest logo is the real icon.
 fn packaged_exe_icon(path: &str) -> Option<String> {
     let family = package_family_from_windows_apps_path(path)?;
-    let aumid = find_aumid_by_family(&family)?;
-    icon_from_aumid(&aumid)
+    match find_aumid_by_family(&family) {
+        Some(aumid) => icon_from_aumid(&aumid),
+        // Enumeration can miss apps (e.g. while the shell is still indexing);
+        // most packages use the conventional `!App` entry point.
+        None => icon_from_aumid(&format!("{family}!App")),
+    }
 }
 
 /// Command line of a process, via WMI. Used to identify PWAs hosted inside browser processes.
@@ -3141,141 +3148,6 @@ pub fn get_brightness() -> u32 {
 // The radio state only says Wi-Fi is on, not whether it is connected, so the
 // notch quick settings needs a second bit to distinguish "on" from "connected".
 
-pub fn get_wlan_connection_info_sync() -> (bool, String) {
-    use windows::Win32::Foundation::HANDLE;
-    use windows::Win32::NetworkManagement::WiFi::{
-        wlan_intf_opcode_current_connection, WlanCloseHandle, WlanEnumInterfaces, WlanFreeMemory,
-        WlanOpenHandle, WlanQueryInterface, WLAN_CONNECTION_ATTRIBUTES, WLAN_INTERFACE_INFO_LIST,
-    };
-
-    unsafe {
-        let mut negotiated_version = 0u32;
-        let mut client_handle = HANDLE::default();
-        if WlanOpenHandle(2, None, &mut negotiated_version, &mut client_handle) != 0 {
-            return (false, String::new());
-        }
-
-        let mut interface_list: *mut WLAN_INTERFACE_INFO_LIST = std::ptr::null_mut();
-        let mut connected = false;
-        let mut ssid = String::new();
-        if WlanEnumInterfaces(client_handle, None, &mut interface_list) != 0 {
-            WlanCloseHandle(client_handle, None);
-            return (false, String::new());
-        }
-        if let Some(list) = interface_list.as_ref() {
-            let count = list.dwNumberOfItems as usize;
-            if count > 0 && count <= 64 {
-                let interfaces = std::slice::from_raw_parts(list.InterfaceInfo.as_ptr(), count);
-                for interface in interfaces {
-                    let mut data_size = 0u32;
-                    let mut data: *mut std::ffi::c_void = std::ptr::null_mut();
-                    let result = WlanQueryInterface(
-                        client_handle,
-                        &interface.InterfaceGuid,
-                        wlan_intf_opcode_current_connection,
-                        None,
-                        &mut data_size,
-                        &mut data,
-                        None,
-                    );
-                    if result == 0 && !data.is_null() {
-                        connected = true;
-                        let attr = &*(data as *const WLAN_CONNECTION_ATTRIBUTES);
-                        let ssid_len = attr.wlanAssociationAttributes.dot11Ssid.uSSIDLength as usize;
-                        if ssid_len > 0 {
-                            let len = ssid_len.min(32);
-                            let bytes = &attr.wlanAssociationAttributes.dot11Ssid.ucSSID[..len];
-                            ssid = String::from_utf8_lossy(bytes).trim().to_string();
-                        }
-                    }
-                    if !data.is_null() {
-                        WlanFreeMemory(data);
-                    }
-                    if connected {
-                        break;
-                    }
-                }
-            }
-            WlanFreeMemory(interface_list as *const _);
-        }
-
-        WlanCloseHandle(client_handle, None);
-        (connected, ssid)
-    }
-}
-
-pub fn get_wlan_status_fast() -> (bool, bool, String) {
-    use windows::Win32::Foundation::HANDLE;
-    use windows::Win32::NetworkManagement::WiFi::{
-        wlan_intf_opcode_current_connection, wlan_interface_state_not_ready, WlanCloseHandle,
-        WlanEnumInterfaces, WlanFreeMemory, WlanOpenHandle, WlanQueryInterface,
-        WLAN_CONNECTION_ATTRIBUTES, WLAN_INTERFACE_INFO_LIST,
-    };
-
-    unsafe {
-        let mut negotiated_version = 0u32;
-        let mut client_handle = HANDLE::default();
-        if WlanOpenHandle(2, None, &mut negotiated_version, &mut client_handle) != 0 {
-            return (false, false, String::new());
-        }
-
-        let mut interface_list: *mut WLAN_INTERFACE_INFO_LIST = std::ptr::null_mut();
-        let mut enabled = false;
-        let mut connected = false;
-        let mut ssid = String::new();
-        if WlanEnumInterfaces(client_handle, None, &mut interface_list) != 0 {
-            WlanCloseHandle(client_handle, None);
-            return (false, false, String::new());
-        }
-        if let Some(list) = interface_list.as_ref() {
-            let count = list.dwNumberOfItems as usize;
-            if count > 0 && count <= 64 {
-                let interfaces = std::slice::from_raw_parts(list.InterfaceInfo.as_ptr(), count);
-                for interface in interfaces {
-                    if interface.isState != wlan_interface_state_not_ready {
-                        enabled = true;
-                    }
-                    let mut data_size = 0u32;
-                    let mut data: *mut std::ffi::c_void = std::ptr::null_mut();
-                    let result = WlanQueryInterface(
-                        client_handle,
-                        &interface.InterfaceGuid,
-                        wlan_intf_opcode_current_connection,
-                        None,
-                        &mut data_size,
-                        &mut data,
-                        None,
-                    );
-                    if result == 0 && !data.is_null() {
-                        connected = true;
-                        let attr = &*(data as *const WLAN_CONNECTION_ATTRIBUTES);
-                        let ssid_len = attr.wlanAssociationAttributes.dot11Ssid.uSSIDLength as usize;
-                        if ssid_len > 0 {
-                            let len = ssid_len.min(32);
-                            let bytes = &attr.wlanAssociationAttributes.dot11Ssid.ucSSID[..len];
-                            ssid = String::from_utf8_lossy(bytes).trim().to_string();
-                        }
-                    }
-                    if !data.is_null() {
-                        WlanFreeMemory(data);
-                    }
-                    if connected {
-                        break;
-                    }
-                }
-            }
-            WlanFreeMemory(interface_list as *const _);
-        }
-
-        WlanCloseHandle(client_handle, None);
-        (enabled, connected, ssid)
-    }
-}
-
-fn is_wlan_connected_sync() -> bool {
-    get_wlan_connection_info_sync().0
-}
-
 fn is_ethernet_connected_sync() -> bool {
     use windows::Win32::NetworkManagement::IpHelper::{FreeMibTable, GetIfTable2, MIB_IF_TABLE2};
 
@@ -3308,8 +3180,13 @@ fn is_ethernet_connected_sync() -> bool {
 #[tauri::command]
 pub async fn get_wifi_status() -> Result<WifiStatus, String> {
     tauri::async_runtime::spawn_blocking(|| -> Result<WifiStatus, String> {
-        let enabled = get_radio_state_sync(windows::Devices::Radios::RadioKind::WiFi)?;
-        let connected = enabled && is_wlan_connected_sync();
+        let wlan = crate::wifi::snapshot();
+        // The radio API can miss adapters whose driver doesn't expose a
+        // Windows.Devices.Radios entry; association state is authoritative.
+        let radio_on = get_radio_state_sync(windows::Devices::Radios::RadioKind::WiFi)
+            .unwrap_or(wlan.enabled);
+        let enabled = radio_on || wlan.connected;
+        let connected = wlan.connected;
         let ethernet_connected = is_ethernet_connected_sync();
         Ok(WifiStatus {
             enabled,
@@ -4742,7 +4619,8 @@ pub async fn search_user_files(query: String) -> Vec<SearchFileItem> {
 pub async fn get_internet_status() -> Result<InternetStatus, String> {
     tauri::async_runtime::spawn_blocking(|| -> Result<InternetStatus, String> {
         let ethernet_connected = is_ethernet_connected_sync();
-        let (wifi_enabled, wifi_connected, ssid) = get_wlan_status_fast();
+        let wlan = crate::wifi::snapshot();
+        let (wifi_enabled, wifi_connected, ssid) = (wlan.enabled || wlan.connected, wlan.connected, wlan.ssid);
 
         let (connection_type, label, is_connected) = if ethernet_connected {
             ("ethernet".to_string(), "Ethernet".to_string(), true)
@@ -4766,97 +4644,36 @@ pub async fn get_internet_status() -> Result<InternetStatus, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// Fresh scan of nearby networks via the native WLAN API. Fails with
+/// `wifi::LOCATION_PERMISSION_ERROR` when Windows location privacy blocks it.
 #[tauri::command]
 pub async fn get_available_wifi_networks() -> Result<Vec<WifiNetworkEntry>, String> {
-    tauri::async_runtime::spawn_blocking(|| -> Result<Vec<WifiNetworkEntry>, String> {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-
-        let (_, current_ssid) = get_wlan_connection_info_sync();
-
-        let output = Command::new("netsh")
-            .args(["wlan", "show", "networks", "mode=bssid"])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        let text = String::from_utf8_lossy(&output.stdout);
-        let mut networks: Vec<WifiNetworkEntry> = Vec::new();
-        let mut current_entry: Option<WifiNetworkEntry> = None;
-
-        for line in text.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with("SSID ") {
-                if let Some(entry) = current_entry.take() {
-                    if !entry.ssid.is_empty() && !networks.iter().any(|n| n.ssid == entry.ssid) {
-                        networks.push(entry);
-                    }
-                }
-                if let Some(idx) = trimmed.find(':') {
-                    let ssid = trimmed[idx + 1..].trim().to_string();
-                    if !ssid.is_empty() {
-                        let is_conn = !current_ssid.is_empty() && ssid.eq_ignore_ascii_case(&current_ssid);
-                        current_entry = Some(WifiNetworkEntry {
-                            ssid,
-                            signal_percent: 50,
-                            is_secure: true,
-                            is_connected: is_conn,
-                        });
-                    }
-                }
-            } else if let Some(ref mut entry) = current_entry {
-                if trimmed.starts_with("Authentication") {
-                    if let Some(idx) = trimmed.find(':') {
-                        let auth = trimmed[idx + 1..].trim();
-                        entry.is_secure = !auth.eq_ignore_ascii_case("Open");
-                    }
-                } else if trimmed.starts_with("Signal") {
-                    if let Some(idx) = trimmed.find(':') {
-                        let sig_str = trimmed[idx + 1..].trim().replace('%', "");
-                        if let Ok(pct) = sig_str.parse::<u8>() {
-                            if pct > entry.signal_percent || entry.signal_percent == 50 {
-                                entry.signal_percent = pct;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if let Some(entry) = current_entry {
-            if !entry.ssid.is_empty() && !networks.iter().any(|n| n.ssid == entry.ssid) {
-                networks.push(entry);
-            }
-        }
-
-        networks.sort_by(|a, b| {
-            b.is_connected
-                .cmp(&a.is_connected)
-                .then_with(|| b.signal_percent.cmp(&a.signal_percent))
-        });
-
-        Ok(networks)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(crate::wifi::scan_networks)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub async fn connect_wifi_network(ssid: String, _password: Option<String>) -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(move || -> Result<bool, String> {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
+pub async fn connect_wifi_network(ssid: String, password: Option<String>) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || crate::wifi::connect(&ssid, password.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
+}
 
-        let status = Command::new("netsh")
-            .args(["wlan", "connect", &format!("name=\"{}\"", ssid)])
-            .creation_flags(0x08000000)
-            .status()
-            .map_err(|e| e.to_string())?;
-
-        Ok(status.success())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+#[tauri::command]
+pub fn open_location_settings() {
+    unsafe {
+        use windows::Win32::UI::Shell::ShellExecuteA;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        let _ = ShellExecuteA(
+            None,
+            windows::core::PCSTR(c"open".as_ptr() as *const u8),
+            windows::core::PCSTR(c"ms-settings:privacy-location".as_ptr() as *const u8),
+            windows::core::PCSTR::null(),
+            windows::core::PCSTR::null(),
+            SW_SHOWNORMAL,
+        );
+    }
 }
 
 #[tauri::command]
