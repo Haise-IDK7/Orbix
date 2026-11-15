@@ -1127,3 +1127,251 @@ input:checked + .slider:before {
 	background: rgba(239, 68, 68, 0.25);
 	color: #ef4444;
 }
+
+/* ── Pinned apps manager (Dock tab) ───────────────────────────────────── */
+.pinned-manager {
+	padding: 12px 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.pinned-manager-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.pinned-manager-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.pinned-manager-max {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.pinned-list,
+.pinned-picker-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.pinned-picker-list {
+	max-height: 240px;
+	overflow-y: auto;
+}
+
+.pinned-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 8px;
+	border-radius: 8px;
+	transition: background 0.15s ease;
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: none;
+	text-align: left;
+	width: 100%;
+}
+
+.pinned-row:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+
+.pinned-row.pickable {
+	cursor: pointer;
+}
+
+.pinned-row.hidden-by-limit {
+	opacity: 0.5;
+}
+
+.pinned-app-icon {
+	width: 22px;
+	height: 22px;
+	border-radius: 6px;
+	object-fit: contain;
+	flex-shrink: 0;
+}
+
+.pinned-app-icon.fallback {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255, 255, 255, 0.1);
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.pinned-name {
+	flex: 1;
+	min-width: 0;
+	font-size: 13px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pinned-badge {
+	font-size: 10.5px;
+	padding: 2px 6px;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--text-muted);
+}
+
+.pinned-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 6px;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.pinned-btn:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--text-color);
+}
+
+.pinned-btn:disabled {
+	opacity: 0.3;
+	cursor: default;
+}
+
+.pinned-btn.danger:hover {
+	background: rgba(248, 113, 113, 0.18);
+	color: #fca5a5;
+}
+
+.pinned-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	align-self: flex-start;
+	padding: 6px 12px;
+	border-radius: 8px;
+	border: 1px dashed rgba(255, 255, 255, 0.18);
+	background: transparent;
+	color: var(--text-color);
+	font: inherit;
+	font-size: 12.5px;
+	cursor: pointer;
+}
+
+.pinned-add:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+
+.pinned-add-icon {
+	color: var(--text-muted);
+}
+
+.pinned-search {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 8px;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.06);
+	color: var(--text-muted);
+	margin-bottom: 4px;
+}
+
+.pinned-search input {
+	flex: 1;
+	border: none;
+	outline: none;
+	background: transparent;
+	color: var(--text-color);
+	font: inherit;
+	font-size: 13px;
+}
+
+.pinned-empty {
+	font-size: 12px;
+	color: var(--text-muted);
+	padding: 6px 8px;
+}
+
+/* ── Notch font picker (Appearance tab) ───────────────────────────────── */
+.font-picker {
+	padding: 12px 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.font-picker-title {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.font-picker-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 8px;
+}
+
+.font-option {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	padding: 10px 12px;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.03);
+	color: var(--text-color);
+	cursor: pointer;
+	text-align: left;
+	transition:
+		border-color 0.15s ease,
+		background 0.15s ease;
+}
+
+.font-option:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.font-option.active {
+	border-color: var(--bloom-accent, #007aff);
+	background: rgba(0, 122, 255, 0.12);
+}
+
+.font-option-sample {
+	font-size: 22px;
+	font-weight: 650;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.02em;
+	line-height: 1.1;
+}
+
+.font-option-name {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.font-option-desc {
+	font-size: 10.5px;
+	color: var(--text-muted);
+	line-height: 1.3;
+}

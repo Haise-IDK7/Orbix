@@ -1,5 +1,6 @@
 import { Palette, Droplet, Contrast, Droplets, Sun, Square, Maximize2, Sparkles } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { NotchFontPicker } from "./NotchFontPicker";
 
 interface AppearanceTabProps {
 	themeMode: string;
@@ -157,6 +158,11 @@ export function AppearanceTab({
 						</SettingRow>
 					</>
 				)}
+			</div>
+
+			<div className="setting-group-label">Typography</div>
+			<div className="setting-group">
+				<NotchFontPicker />
 			</div>
 
 			<div className="setting-group-label">Display</div>

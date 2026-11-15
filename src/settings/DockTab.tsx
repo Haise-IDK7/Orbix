@@ -18,6 +18,7 @@ import {
 	X
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { PinnedAppsManager } from "./PinnedAppsManager";
 import { KNOWN_FOLDER_OPTIONS, parseEnabledFolders, parseCustomFolders } from "../dockExtras";
 
 const START_ICON_PRESETS = [
@@ -418,6 +419,15 @@ export function DockTab({
 					</>
 				)}
 			</div>
+
+			{dockEnabled && (
+				<>
+					<div className="setting-group-label">Fixed Apps</div>
+					<div className="setting-group">
+						<PinnedAppsManager />
+					</div>
+				</>
+			)}
 		</>
 	);
 }

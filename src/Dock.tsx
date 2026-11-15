@@ -7,6 +7,7 @@ import { initTheme } from "./theme";
 import { useSettingsSync } from "./hooks/useSettingsSync";
 import { useGlassBackdrop } from "./hooks/useGlassBackdrop";
 import { GlassLayer } from "./components/glass/GlassLayer";
+import { useStoredSetting } from "./hooks/useStoredSetting";
 import { reloadIfMirrorWasStale } from "./hooks/settingsMirror";
 
 import { mergeTrayApps, selectDockTrayApps, type AppInfo, type TrayApp } from "./dockApps";
@@ -158,6 +159,11 @@ const Dock = memo(function Dock() {
 		() => localStorage.getItem("bloom-dock-adaptive") === "true"
 	);
 	const [glassStyle, setGlassStyle] = useState(() => localStorage.getItem("bloom-glass-style") !== "false");
+	// Pinned apps beyond this count stay pinned but only show while running (0 = all).
+	const [maxPinnedValue] = useStoredSetting("bloom-dock-max-pinned", "0");
+	const maxPinned = parseInt(maxPinnedValue, 10) || 0;
+	// Bumped by the settings window after editing the pinned list.
+	const [pinnedRevision] = useStoredSetting("bloom-dock-pinned-revision", "0");
 	useGlassBackdrop(glassStyle);
 	const [startIcon, setStartIcon] = useState(
 		() => localStorage.getItem("bloom-start-icon") || "default"
@@ -921,7 +927,7 @@ const Dock = memo(function Dock() {
 				all_hwnds: undefined,
 				executable: undefined
 			},
-			...pinnedApps.map((p) => {
+			...(maxPinned > 0 ? pinnedApps.slice(0, maxPinned) : pinnedApps).map((p) => {
 				const running = findRunningApp(p);
 				return {
 					...p,
@@ -942,7 +948,7 @@ const Dock = memo(function Dock() {
 			);
 
 		return [...pinned, ...unpinned];
-	}, [pinnedApps, activeApps, activeOrder]);
+	}, [pinnedApps, activeApps, activeOrder, maxPinned]);
 
 	const startItem = useMemo(
 		() => dockItems.find((i) => i.path === "start") as AppInfo,
@@ -974,13 +980,29 @@ const Dock = memo(function Dock() {
 
 	// Items are keyed by identity, not path: web apps running in the same
 	// browser share one executable path.
+	// The settings window edited the pinned list: reload it.
+	const pinnedRevisionSeen = useRef(pinnedRevision);
+	useEffect(() => {
+		if (pinnedRevisionSeen.current === pinnedRevision) return;
+		pinnedRevisionSeen.current = pinnedRevision;
+		invoke<AppInfo[]>("load_pinned_apps")
+			.then((apps) => {
+				const next = apps.map((a) => ({ ...a, is_pinned: true }));
+				setPinnedApps(next);
+				next.forEach((app) => fetchIcon(app.path, app.name));
+			})
+			.catch(console.error);
+	}, [pinnedRevision]);
+
 	const handleReorder = (newKeys: string[]) => {
 		const oldKeys = pinnedApps.map(itemKey);
 		if (JSON.stringify(newKeys) !== JSON.stringify(oldKeys)) {
 			const reordered = newKeys
 				.map((key) => pinnedApps.find((p) => itemKey(p) === key))
 				.filter((p): p is AppInfo => !!p);
-			setPinnedApps(reordered);
+			// Pins hidden by the max-pinned limit aren't in the group; keep them.
+			const hidden = pinnedApps.filter((p) => !newKeys.includes(itemKey(p)));
+			setPinnedApps([...reordered, ...hidden]);
 		}
 	};
 

@@ -103,9 +103,15 @@ pub struct SearchFileItem {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AudioDeviceStatus {
     pub headphone_connected: bool,
+    /// Endpoint name, e.g. "Headphones (AirBuds Pro)".
     pub headphone_name: String,
     pub mic_connected: bool,
     pub mic_name: String,
+    /// The device's own name, e.g. "AirBuds Pro".
+    #[serde(default)]
+    pub output_device: String,
+    #[serde(default)]
+    pub output_bluetooth: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

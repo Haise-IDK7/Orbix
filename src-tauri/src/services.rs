@@ -934,80 +934,113 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
     });
 }
 
+/// Reads one string property of an audio endpoint.
+unsafe fn endpoint_string(
+    store: &windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore,
+    key: &windows::Win32::Foundation::PROPERTYKEY,
+) -> Option<String> {
+    let mut prop = unsafe { store.GetValue(key) }.ok()?;
+    let text = unsafe { windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc(&prop) }
+        .ok()
+        .map(|pwstr| {
+            let s = String::from_utf16_lossy(unsafe { pwstr.as_wide() }).trim().to_string();
+            unsafe { windows::Win32::System::Com::CoTaskMemFree(Some(pwstr.0 as *const _)) };
+            s
+        });
+    let _ = unsafe { windows::Win32::System::Com::StructuredStorage::PropVariantClear(&mut prop) };
+    text.filter(|s| !s.is_empty())
+}
+
+/// Endpoint form factors (EndpointFormFactor) that are worn on the head.
+const FORM_FACTOR_HEADPHONES: u32 = 3;
+const FORM_FACTOR_HEADSET: u32 = 5;
+
+/// Words that mark a worn audio device in endpoint names, across the
+/// languages Windows localizes "Headphones" into.
+const HEADPHONE_WORDS: &[&str] = &[
+    "headphone", "headset", "earphone", "earbud", "airpod", "buds", "wh-", "wf-",
+    "auricular", "audífono", "audifono", "cascos", "casque", "écouteur", "ecouteur",
+    "kopfhörer", "kopfhorer", "cuffie", "fones",
+];
+
+/// (worn on the head, connected over Bluetooth) for the default output.
+fn classify_output(endpoint_name: &str, form_factor: Option<u32>, enumerator: Option<&str>) -> (bool, bool) {
+    let lower = endpoint_name.to_lowercase();
+    let bluetooth = enumerator.is_some_and(|e| e.to_ascii_uppercase().starts_with("BTH"))
+        || lower.contains("bluetooth")
+        || lower.contains("hands-free")
+        || lower.contains("manos libres");
+    let worn = matches!(form_factor, Some(FORM_FACTOR_HEADPHONES | FORM_FACTOR_HEADSET))
+        || HEADPHONE_WORDS.iter().any(|w| lower.contains(w))
+        || (bluetooth && !(lower.contains("speaker") || lower.contains("altavoz") || lower.contains("bocina")));
+    (worn, bluetooth)
+}
+
 pub fn query_audio_devices_status(
     enumerator: &windows::Win32::Media::Audio::IMMDeviceEnumerator,
 ) -> crate::types::AudioDeviceStatus {
+    use windows::core::GUID;
     use windows::Win32::Foundation::PROPERTYKEY;
     use windows::Win32::Media::Audio::{eCapture, eConsole, eRender};
     use windows::Win32::System::Com::STGM;
 
     const PKEY_DEVICE_FRIENDLY_NAME: PROPERTYKEY = PROPERTYKEY {
-        fmtid: windows::core::GUID {
-            data1: 0xa45c254e,
-            data2: 0xdf1c,
-            data3: 0x4efd,
-            data4: [0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0],
-        },
+        fmtid: GUID::from_u128(0xa45c254e_df1c_4efd_8020_67d146a850e0),
         pid: 14,
     };
+    const PKEY_DEVICE_ENUMERATOR_NAME: PROPERTYKEY = PROPERTYKEY {
+        fmtid: GUID::from_u128(0xa45c254e_df1c_4efd_8020_67d146a850e0),
+        pid: 24,
+    };
+    // The device's own name ("AirBuds Pro") rather than "Headphones (AirBuds Pro)".
+    const PKEY_DEVICE_INTERFACE_FRIENDLY_NAME: PROPERTYKEY = PROPERTYKEY {
+        fmtid: GUID::from_u128(0x026e516e_b814_414b_83cd_856d6fef4822),
+        pid: 2,
+    };
+    const PKEY_AUDIO_ENDPOINT_FORM_FACTOR: PROPERTYKEY = PROPERTYKEY {
+        fmtid: GUID::from_u128(0x1da5d803_d492_4edd_8c23_e0c0ffee7f0e),
+        pid: 0,
+    };
 
-    let mut headphone_connected = false;
-    let mut headphone_name = String::new();
-    let mut mic_connected = false;
-    let mut mic_name = String::new();
+    let mut status = crate::types::AudioDeviceStatus {
+        headphone_connected: false,
+        headphone_name: String::new(),
+        mic_connected: false,
+        mic_name: String::new(),
+        output_device: String::new(),
+        output_bluetooth: false,
+    };
 
     unsafe {
         // 1. Render endpoint (Speakers / Headphones)
         if let Ok(render_dev) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
             if let Ok(store) = render_dev.OpenPropertyStore(STGM(0)) {
-                if let Ok(prop) = store.GetValue(&PKEY_DEVICE_FRIENDLY_NAME) {
-                    if let Ok(pwstr) = windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc(&prop) {
-                        let name = String::from_utf16_lossy(pwstr.as_wide()).trim().to_string();
-                        windows::Win32::System::Com::CoTaskMemFree(Some(pwstr.0 as *const _));
-                        let lower = name.to_lowercase();
-                        if lower.contains("headphone")
-                            || lower.contains("headset")
-                            || lower.contains("earphone")
-                            || lower.contains("airpod")
-                            || lower.contains("buds")
-                            || lower.contains("wh-")
-                            || lower.contains("wf-")
-                            || lower.contains("wireless stereo")
-                            || (lower.contains("bluetooth") && !lower.contains("speaker"))
-                        {
-                            headphone_connected = true;
-                        }
-                        headphone_name = name;
-                    }
-                    let mut prop_mut = prop;
-                    let _ = windows::Win32::System::Com::StructuredStorage::PropVariantClear(&mut prop_mut);
-                }
+                let name = endpoint_string(&store, &PKEY_DEVICE_FRIENDLY_NAME).unwrap_or_default();
+                let enumerator_name = endpoint_string(&store, &PKEY_DEVICE_ENUMERATOR_NAME);
+                let form_factor = store.GetValue(&PKEY_AUDIO_ENDPOINT_FORM_FACTOR).ok().and_then(|mut prop| {
+                    let value = windows::Win32::System::Com::StructuredStorage::PropVariantToUInt32(&prop).ok();
+                    let _ = windows::Win32::System::Com::StructuredStorage::PropVariantClear(&mut prop);
+                    value
+                });
+                let (worn, bluetooth) = classify_output(&name, form_factor, enumerator_name.as_deref());
+                status.headphone_connected = worn;
+                status.output_bluetooth = bluetooth;
+                status.output_device = endpoint_string(&store, &PKEY_DEVICE_INTERFACE_FRIENDLY_NAME)
+                    .unwrap_or_else(|| name.clone());
+                status.headphone_name = name;
             }
         }
 
         // 2. Capture endpoint (Microphone)
         if let Ok(capture_dev) = enumerator.GetDefaultAudioEndpoint(eCapture, eConsole) {
-            mic_connected = true;
+            status.mic_connected = true;
             if let Ok(store) = capture_dev.OpenPropertyStore(STGM(0)) {
-                if let Ok(prop) = store.GetValue(&PKEY_DEVICE_FRIENDLY_NAME) {
-                    if let Ok(pwstr) = windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc(&prop) {
-                        let name = String::from_utf16_lossy(pwstr.as_wide()).trim().to_string();
-                        windows::Win32::System::Com::CoTaskMemFree(Some(pwstr.0 as *const _));
-                        mic_name = name;
-                    }
-                    let mut prop_mut = prop;
-                    let _ = windows::Win32::System::Com::StructuredStorage::PropVariantClear(&mut prop_mut);
-                }
+                status.mic_name = endpoint_string(&store, &PKEY_DEVICE_FRIENDLY_NAME).unwrap_or_default();
             }
         }
     }
 
-    crate::types::AudioDeviceStatus {
-        headphone_connected,
-        headphone_name,
-        mic_connected,
-        mic_name,
-    }
+    status
 }
 
 pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
@@ -4157,6 +4190,15 @@ mod tests {
         filetime_to_unix_ms, is_helper_name, is_launchable_entry, notch_mode_reserves_work_area,
         win_number_index,
     };
+
+    #[test]
+    fn classifies_output_devices() {
+        use super::classify_output;
+        assert_eq!(classify_output("Auriculares (AirBuds Pro)", None, Some("BTHENUM")), (true, true));
+        assert_eq!(classify_output("Altavoces (Realtek(R) Audio)", Some(1), Some("HDAUDIO")), (false, false));
+        assert_eq!(classify_output("Speakers (JBL Flip 5)", Some(1), Some("BTHENUM")), (false, true));
+        assert_eq!(classify_output("Realtek USB", Some(3), None), (true, false));
+    }
 
     #[test]
     fn converts_filetime_to_unix_ms() {

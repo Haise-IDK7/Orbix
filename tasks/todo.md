@@ -12,6 +12,17 @@
 - [x] Dock: pin WhatsApp/Spotify once when installed; sturdier packaged-app icon lookup
 - [x] Glass style for notch and dock with Appearance toggle (`src-tauri/src/glass.rs`, `src/components/glass/`)
 
+### Round 2: icons, dock pins, fonts, panels, clipboard
+- [x] Store-app icons from the package manifest (`package_icon.rs`), icon cache v2
+- [x] Pinned apps manager + max pinned (Settings → Dock)
+- [x] Notch fonts (6 bundled) + tabular numbers
+- [x] Performance tile in quick actions
+- [x] Lyrics layout: vertical / horizontal
+- [x] Pomodoro panel (isolated store) and Tasks panel
+- [x] Audio device card, localized headphone detection, current output in controls
+- [x] Shelf: always reachable, Files/Clipboard tabs, paste, clipboard history (`clipboard.rs`)
+- [x] Page dots, mojibake fixes
+
 ### Previous
 
 - [x] Task 1: Backend Non-Recursive Direct Folder Scanning (`src-tauri/src/wallpaper.rs`)

@@ -34,6 +34,8 @@ Edit `settings.json` with any text editor while Orbix is running. Changes are ap
 | `bloom-dock-extras-recycle-bin`    | `"true"` / `"false"`             | `"true"`      | Show the Recycle Bin in the dock extras. The icon reflects whether the bin holds anything.                                                                                       |
 | `bloom-dock-extras-folders`        | comma-separated ids              | `"downloads"` | Known folders in the dock extras: any of `desktop`, `downloads`, `documents`, `pictures`, `music`, `videos`, or `"none"` for no folders.                                         |
 | `bloom-dock-extras-custom-folders` | JSON array                       | `"[]"`        | User-added folders, e.g. `[{"name":"Projects","path":"D:\\Projects"}]`. Folders that no longer exist are skipped until they return.                                              |
+| `bloom-dock-max-pinned` | `"0"`–`"12"` | `"0"` | How many pinned apps the dock shows (`0` = all). Extra pins stay pinned and appear while running. |
+| `bloom-dock-pinned-revision` | timestamp | — | Internal: bumped by Settings after editing pinned apps so the dock reloads. |
 
 ### Notch
 
@@ -64,6 +66,8 @@ Edit `settings.json` with any text editor while Orbix is running. Changes are ap
 | `bloom-wallpaper-folder`     | string path          | `""`      | Custom folder containing wallpapers (empty = default Windows wallpapers). |
 | `bloom-music-mode-enabled`  | `"true"` / `"false"` | `"true"` | Enable interactive music media widget.                                |
 | `bloom-music-compact-notch` | `"true"` / `"false"` | `"true"` | Show compact music display (visualizer + artwork) in collapsed notch. |
+| `bloom-pomodoro-enabled` | `"true"` / `"false"` | `"true"` | Pomodoro panel in the notch cycle. |
+| `bloom-tasks-enabled` | `"true"` / `"false"` | `"true"` | Tasks (to-do) panel in the notch cycle. |
 
 ### Notch Quick Controls & Audio
 
@@ -81,6 +85,8 @@ Edit `settings.json` with any text editor while Orbix is running. Changes are ap
 | Key                   | Type                 | Default   | Description                                                                                                    |
 | --------------------- | -------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
 | `bloom-shelf-persist` | `"true"` / `"false"` | `"false"` | Keep notch shelf items across restarts. Off = items are cleared when Orbix closes. Max 10 items, newest first. |
+| `bloom-clipboard-history` | `"true"` / `"false"` | `"true"` | Clipboard history tab in the shelf (memory only; private copies are skipped). |
+| `bloom-shelf-tab` | `"files"` / `"clipboard"` | `"files"` | Last shelf tab shown. |
 
 ### Music Appearance
 
@@ -91,6 +97,7 @@ Edit `settings.json` with any text editor while Orbix is running. Changes are ap
 | `bloom-media-compact-glow-enabled` | `"true"` / `"false"`      | `"true"`    | Glow effect around the collapsed compact thumbnail.                                             |
 | `bloom-media-visualizer-enabled`   | `"true"` / `"false"`      | `"true"`    | Audio visualizer bars in music mode. Also accepts `bloom-visualizer-enabled` (legacy alias).    |
 | `bloom-media-album-art-enabled`    | `"true"` / `"false"`      | `"true"`    | Show album artwork in the notch music display.                                                  |
+| `bloom-lyrics-layout` | `"vertical"` / `"horizontal"` | `"vertical"` | Lyrics below the player or beside it. |
 
 ### Overlays
 
@@ -114,6 +121,7 @@ Edit `settings.json` with any text editor while Orbix is running. Changes are ap
 | `bloom-theme-brightness` | float string                                     | `"0.15"`    | Background brightness for custom/adaptive themes (0.0 to 1.0).                                                                                              |
 | `bloom-corners-enabled`  | `"true"` / `"false"`                             | `"false"`   | Render rounded screen corner overlays on top edges.                                                                                                         |
 | `bloom-glass-style`      | `"true"` / `"false"`                             | `"true"`    | Frosted "crystal" background for the notch and dock (blurred wallpaper + tint).                                                                            |
+| `bloom-notch-font` | `"inter"` / `"geist"` / `"outfit"` / `"space-grotesk"` / `"sora"` / `"plus-jakarta-sans"` | `"inter"` | Notch typeface (bundled, works offline). |
 
 ### Status Widgets
 

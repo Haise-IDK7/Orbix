@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wifi, Bluetooth, Volume2, VolumeX, Sun, SlidersHorizontal } from "lucide-react";
+import { Wifi, Bluetooth, Volume2, VolumeX, Sun, SlidersHorizontal, Headphones, Speaker } from "lucide-react";
 import { SplitPillCard } from "./SplitPillCard";
 import { QuickActionGrid } from "./QuickActionGrid";
 import { ControlsFooter } from "./ControlsFooter";
@@ -12,6 +12,9 @@ import { InternetStatus, MicrophoneState, SubViewMode } from "./types";
 import "./ControlsView.css";
 
 interface ControlsViewProps {
+	/** Name of the current audio output, e.g. "AirBuds Pro". */
+	outputDevice?: string;
+	outputIsHeadphones?: boolean;
 	wifiEnabled: boolean;
 	wifiConnected: boolean;
 	onToggleWifi: () => void;
@@ -61,6 +64,8 @@ interface ControlsViewProps {
 }
 
 export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
+	outputDevice,
+	outputIsHeadphones,
 	wifiEnabled,
 	wifiConnected,
 	onToggleWifi,
@@ -100,6 +105,7 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 	const [subView, setSubView] = useState<SubViewMode>("main");
 	const [internetStatus, setInternetStatus] = useState<InternetStatus | null>(null);
 	const [microphoneState, setMicrophoneState] = useState<MicrophoneState | null>(null);
+	const [ramPercent, setRamPercent] = useState<number | null>(null);
 
 	// Local slider states for instant 0ms latency dragging
 	const [localVol, setLocalVol] = useState(volume);
@@ -128,6 +134,10 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 		} catch (err) {
 			console.error("Failed to fetch internet status:", err);
 		}
+
+		invoke<number>("get_ram_usage")
+			.then((ram) => setRamPercent(Math.round(ram)))
+			.catch(() => {});
 
 		try {
 			const mic = await invoke<MicrophoneState>("get_microphone_state");
@@ -266,10 +276,18 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 							onOpenNotificationCenter={handleOpenNotificationCenter}
 							onOpenNightLightSettings={handleOpenNightLightSettings}
 							onOpenSystemTray={onOpenSystemTray}
+							ramPercent={ramPercent}
+							onOpenPerformance={() => updateSubView("performance")}
 						/>
 
 						{/* Sliders Area */}
 						<div className="cc-sliders-container">
+							{outputDevice && (
+								<div className="cc-output-device" title="Current audio output">
+									{outputIsHeadphones ? <Headphones size={11} /> : <Speaker size={11} />}
+									<span>{outputDevice}</span>
+								</div>
+							)}
 							{/* Volume Slider */}
 							<div className="cc-slider-row">
 								<button
@@ -366,7 +384,6 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 							onRestartShell={handleRestartShell}
 							onOpenSettings={onOpenSettings}
 							onOpenNetworkSettings={handleOpenNetworkSettings}
-							onOpenPerformance={() => updateSubView("performance")}
 						/>
 					</motion.div>
 				) : subView === "wifi" ? (

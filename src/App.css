@@ -47,7 +47,7 @@ img {
 	/* No overflow:hidden — pseudo-elements for concave corners extend outside the box */
 
 	font-family:
-		"Inter",
+		var(--notch-font, "Inter"),
 		-apple-system,
 		BlinkMacSystemFont,
 		"Segoe UI",
@@ -279,8 +279,9 @@ img {
 
 .time {
 	font-size: 13px;
-	font-weight: 500;
-	letter-spacing: 0.3px;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	font-variant-numeric: tabular-nums;
 	line-height: 1;
 	color: var(--bloom-text, white);
 	backface-visibility: hidden;
@@ -2379,4 +2380,37 @@ img {
 .cmp-output-check {
 	font-size: 11px;
 	opacity: 0.6;
+}
+
+/* Page indicator at the bottom of the open notch */
+.panel-dots {
+	position: absolute;
+	bottom: 4px;
+	left: 50%;
+	transform: translateX(-50%);
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	z-index: 3;
+}
+
+.panel-dot {
+	height: 4px;
+	padding: 0;
+	border: none;
+	border-radius: 2px;
+	background: rgba(255, 255, 255, 0.28);
+	cursor: pointer;
+	transition: background 0.2s ease;
+}
+
+.panel-dot.active {
+	background: rgba(255, 255, 255, 0.9);
+}
+
+/* Numbers that change in place shouldn't make text jitter. */
+.bloom .passive-feature,
+.bloom .cmp-time,
+.bloom .cc-slider-pct {
+	font-variant-numeric: tabular-nums;
 }

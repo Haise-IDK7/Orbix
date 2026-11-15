@@ -18,11 +18,20 @@ import {
 	HeadphonesIcon
 } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
-import { LyricsPanel, LYRICS_PANEL_HEIGHT } from "./components/lyrics/LyricsPanel";
+import { LyricsPanel, LYRICS_PANEL_HEIGHT, LYRICS_SIDE_WIDTH } from "./components/lyrics/LyricsPanel";
 import { LyricsTicker, LYRICS_TICKER_HEIGHT } from "./components/lyrics/LyricsTicker";
 import { useActiveLyricIndex, useLyrics } from "./hooks/useLyrics";
 import { GlassLayer } from "./components/glass/GlassLayer";
 import { useGlassBackdrop } from "./hooks/useGlassBackdrop";
+import { useStoredSetting } from "./hooks/useStoredSetting";
+import { applyNotchFont } from "./fonts";
+import { getTimerChimeCtx, playTimerChime } from "./chime";
+import { PomodoroCompact, PomodoroView } from "./components/focus/PomodoroView";
+import { TasksView } from "./components/focus/TasksView";
+import { usePomodoroRunning } from "./components/focus/pomodoroStore";
+import { AudioDeviceCard, AUDIO_CARD_HEIGHT, type AudioToast } from "./components/audio/AudioDeviceCard";
+import { ClipboardList, type ShelfPaste } from "./components/shelf/ClipboardList";
+import { PanelDots } from "./components/PanelDots";
 import { PowerView } from "./components/power/PowerView";
 import { WallpaperView } from "./components/wallpaper/WallpaperView";
 import { AppsView } from "./components/apps/AppsView";
@@ -55,7 +64,11 @@ import {
 	Mic,
 	Zap,
 	Moon,
-	MicVocal
+	MicVocal,
+	ClipboardPaste,
+	ClipboardList as ClipboardIcon,
+	FolderOpen,
+	Inbox
 } from "lucide-react";
 
 // Pomodoro timer limit.
@@ -82,59 +95,6 @@ const formatTimerDigits = (digits: string): string => {
 	const secs = digits.slice(-2).padStart(2, "0");
 	const mins = parseInt(digits.slice(0, -2) || "0", 10);
 	return `${mins}:${secs}`;
-};
-
-// Completion chime for the Pomodoro timer. Synthesized with the Web Audio API
-// so no audio asset is needed; created on the Start click so the webview's
-// autoplay policy lets it play when the timer ends.
-let timerChimeCtx: AudioContext | null = null;
-
-const getTimerChimeCtx = (): AudioContext | null => {
-	try {
-		if (!timerChimeCtx) timerChimeCtx = new AudioContext();
-		if (timerChimeCtx.state === "suspended") timerChimeCtx.resume().catch(() => {});
-		return timerChimeCtx;
-	} catch {
-		return null;
-	}
-};
-
-const playTimerChime = () => {
-	const ctx = getTimerChimeCtx();
-	if (!ctx) return;
-	const start = ctx.currentTime + 0.02;
-	const master = ctx.createGain();
-	master.gain.value = 0.45;
-	master.connect(ctx.destination);
-
-	// Soft rising bell arpeggio (A5â€“C#6â€“E6) with a quiet octave harmonic.
-	const notes = [
-		{ freq: 880.0, at: 0 },
-		{ freq: 1108.73, at: 0.18 },
-		{ freq: 1318.51, at: 0.36 }
-	];
-	notes.forEach(({ freq, at }) => {
-		const osc = ctx.createOscillator();
-		const harmonic = ctx.createOscillator();
-		const gain = ctx.createGain();
-		const harmonicGain = ctx.createGain();
-		osc.type = "sine";
-		osc.frequency.value = freq;
-		harmonic.type = "sine";
-		harmonic.frequency.value = freq * 2.01;
-		harmonicGain.gain.value = 0.12;
-		gain.gain.setValueAtTime(0.0001, start + at);
-		gain.gain.exponentialRampToValueAtTime(0.32, start + at + 0.02);
-		gain.gain.exponentialRampToValueAtTime(0.0001, start + at + 1.4);
-		osc.connect(gain);
-		harmonic.connect(harmonicGain);
-		harmonicGain.connect(gain);
-		gain.connect(master);
-		osc.start(start + at);
-		harmonic.start(start + at);
-		osc.stop(start + at + 1.5);
-		harmonic.stop(start + at + 1.5);
-	});
 };
 
 // Simple SVG icons
@@ -313,7 +273,7 @@ const calendarMonthRows = (() => {
 
 // Odometer-style digit for the timer clock. When the value changes the old
 // digit rolls up and out while the new one rolls in from below with a slight
-// 3D tilt â€” no card chrome, just the numerals.
+// 3D tilt — no card chrome, just the numerals.
 const RollDigit = memo(function RollDigit({
 	value,
 	compact = false
@@ -366,12 +326,23 @@ interface ShelfItem {
 	timestamp: number;
 }
 
-type BloomMode = "music" | "calendar" | "command-center" | "announcement" | "status" | "shelf" | "power" | "wallpaper" | "apps";
+type BloomMode =
+	| "music"
+	| "calendar"
+	| "pomodoro"
+	| "tasks"
+	| "command-center"
+	| "announcement"
+	| "status"
+	| "shelf"
+	| "power"
+	| "wallpaper"
+	| "apps";
 
 // The shelf is a short-lived stash: one row, newest first, oldest evicted.
 const SHELF_MAX_ITEMS = 10;
 
-const MARQUEE_SPEED = 30; // px/s â€” constant for all titles
+const MARQUEE_SPEED = 30; // px/s — constant for all titles
 const MARQUEE_MIN_DURATION = 5; // floor so short titles don't flicker
 
 const TitleMarquee = ({ title }: { title: string }) => {
@@ -533,6 +504,8 @@ function App() {
 		headphone_name: string;
 		mic_connected: boolean;
 		mic_name: string;
+		output_device?: string;
+		output_bluetooth?: boolean;
 	}>({
 		headphone_connected: false,
 		headphone_name: "",
@@ -540,17 +513,14 @@ function App() {
 		mic_name: ""
 	});
 	const audioDevicesRef = useRef(audioDevices);
-	const [audioToast, setAudioToast] = useState<{
-		message: string;
-		type: "headphone" | "mic";
-	} | null>(null);
+	const [audioToast, setAudioToast] = useState<AudioToast | null>(null);
 	const audioToastTimerRef = useRef<number | null>(null);
 	const scheduleNotchCloseRef = useRef<(delay?: number) => void>(() => {});
 	const releaseNotchHoverRef = useRef<() => void>(() => {});
 
-	const triggerAudioToast = useCallback((message: string, type: "headphone" | "mic") => {
+	const triggerAudioToast = useCallback((toast: AudioToast) => {
 		if (audioToastTimerRef.current) clearTimeout(audioToastTimerRef.current);
-		setAudioToast({ message, type });
+		setAudioToast(toast);
 		audioToastTimerRef.current = window.setTimeout(() => {
 			setAudioToast(null);
 			audioToastTimerRef.current = null;
@@ -599,12 +569,7 @@ function App() {
 		invoke<boolean>("get_airplane_mode_state").then(setAirplaneModeActive).catch(() => {});
 		invoke<boolean>("get_mobile_hotspot_state").then(setHotspotActive).catch(() => {});
 		invoke<boolean>("get_dnd_state").then(setDndActive).catch(() => {});
-		invoke<{
-			headphone_connected: boolean;
-			headphone_name: string;
-			mic_connected: boolean;
-			mic_name: string;
-		}>("get_audio_devices")
+		invoke<typeof audioDevicesRef.current>("get_audio_devices")
 			.then((status) => {
 				audioDevicesRef.current = status;
 				setAudioDevices(status);
@@ -613,29 +578,32 @@ function App() {
 
 		let unlistenAudio: (() => void) | undefined;
 		let disposed = false;
-		listen<{
-			headphone_connected: boolean;
-			headphone_name: string;
-			mic_connected: boolean;
-			mic_name: string;
-		}>("audio-device-changed", (event) => {
+		listen<typeof audioDevicesRef.current>("audio-device-changed", (event) => {
 			const prev = audioDevicesRef.current;
 			const next = event.payload;
 			audioDevicesRef.current = next;
 			setAudioDevices(next);
 
 			if (notchAudioIndicator) {
-				if (!prev.headphone_connected && next.headphone_connected) {
-					triggerAudioToast(
-						`Headphones: ${next.headphone_name || "Connected"}`,
-						"headphone"
-					);
-				} else if (prev.headphone_connected && !next.headphone_connected) {
-					triggerAudioToast("Headphones disconnected", "headphone");
+				const outputChanged = !!prev.headphone_name && prev.headphone_name !== next.headphone_name;
+				if (prev.headphone_connected && !next.headphone_connected) {
+					triggerAudioToast({
+						kind: "headphones",
+						title: prev.output_device || prev.headphone_name || "Headphones",
+						connected: false,
+						bluetooth: !!prev.output_bluetooth
+					});
+				} else if (outputChanged && next.headphone_name) {
+					triggerAudioToast({
+						kind: next.headphone_connected ? "headphones" : "speaker",
+						title: next.output_device || next.headphone_name,
+						connected: true,
+						bluetooth: !!next.output_bluetooth
+					});
 				} else if (!prev.mic_connected && next.mic_connected) {
-					triggerAudioToast(`Mic: ${next.mic_name || "Connected"}`, "mic");
+					triggerAudioToast({ kind: "mic", title: next.mic_name || "Microphone", connected: true, bluetooth: false });
 				} else if (prev.mic_connected && !next.mic_connected) {
-					triggerAudioToast("Microphone disconnected", "mic");
+					triggerAudioToast({ kind: "mic", title: prev.mic_name || "Microphone", connected: false, bluetooth: false });
 				}
 			}
 		}).then((fn) => {
@@ -876,6 +844,21 @@ function App() {
 	const [settingsCornersEnabled, setSettingsCornersEnabled] = useState(
 		() => localStorage.getItem("bloom-corners-enabled") === "true"
 	);
+	const [notchFontId] = useStoredSetting("bloom-notch-font", "inter");
+	const [shelfTab, setShelfTab] = useStoredSetting("bloom-shelf-tab", "files");
+	const [clipboardHistoryValue] = useStoredSetting("bloom-clipboard-history", "true");
+	const clipboardHistoryEnabled = clipboardHistoryValue !== "false";
+	useEffect(() => {
+		invoke("set_clipboard_history_enabled", { enabled: clipboardHistoryEnabled }).catch(() => {});
+	}, [clipboardHistoryEnabled]);
+	const showClipboardTab = clipboardHistoryEnabled && shelfTab === "clipboard";
+	const [pomodoroEnabledValue] = useStoredSetting("bloom-pomodoro-enabled", "true");
+	const [tasksEnabledValue] = useStoredSetting("bloom-tasks-enabled", "true");
+	const pomodoroEnabled = pomodoroEnabledValue !== "false";
+	const tasksEnabled = tasksEnabledValue !== "false";
+	// Only flips on start/stop, so the notch doesn't re-render every second.
+	const pomodoroRunning = usePomodoroRunning();
+	useEffect(() => applyNotchFont(notchFontId), [notchFontId]);
 	const [settingsGlassStyle, setSettingsGlassStyle] = useState(
 		() => localStorage.getItem("bloom-glass-style") !== "false"
 	);
@@ -888,6 +871,8 @@ function App() {
 	// Live lyrics: the toggle is remembered, and while on, the current line also
 	// shows under the collapsed notch.
 	const [lyricsOpen, setLyricsOpen] = useState(() => localStorage.getItem("bloom-lyrics-open") === "true");
+	const [lyricsLayout] = useStoredSetting("bloom-lyrics-layout", "vertical");
+	const lyricsBeside = lyricsLayout === "horizontal";
 	const toggleLyrics = useCallback(() => {
 		setLyricsOpen((open) => {
 			localStorage.setItem("bloom-lyrics-open", String(!open));
@@ -1005,7 +990,7 @@ function App() {
 						setTimeout(() => invoke("sync_appbar"), 5000);
 					};
 
-					// Mirror Overlay.tsx's splash decision for dock init too â€” only wait when
+					// Mirror Overlay.tsx's splash decision for dock init too — only wait when
 					// a splash is actually coming, otherwise init immediately.
 					const runDockInitAfterSplash = () => {
 						let dockStarted = false;
@@ -1091,7 +1076,7 @@ function App() {
 		};
 	}, [windowLabel]);
 
-	// Settings sync â€” consolidated dispatch for all settings events
+	// Settings sync — consolidated dispatch for all settings events
 	useSettingsSync(
 		{
 			"bloom-weather-enabled": setSettingsWeatherEnabled,
@@ -1141,7 +1126,7 @@ function App() {
 		[windowLabel]
 	);
 
-	// Side effects: dock-enabled (skip first render â€” startup code handles initial state)
+	// Side effects: dock-enabled (skip first render — startup code handles initial state)
 	useEffect(() => {
 		if (windowLabel !== "main") return;
 		if (dockEnabledInitial.current) {
@@ -1217,7 +1202,7 @@ function App() {
 				localStorage.removeItem("bloom-shelf-items");
 			}
 		} catch {
-			/* storage full or unavailable â€” shelf just won't persist */
+			/* storage full or unavailable — shelf just won't persist */
 		}
 	}, [shelfItems, shelfPersist]);
 
@@ -1338,7 +1323,7 @@ function App() {
 				shelfSelfDragRef.current = false;
 				// A drop recorded during this drag means it landed back on the
 				// notch, so the pointer is still over it. Otherwise the native
-				// drag owned the pointer and the webview never saw it leave â€”
+				// drag owned the pointer and the webview never saw it leave —
 				// release the hover state (flags AND the resting mode) or the
 				// shelf panel stays expanded. The command also makes the
 				// backend re-evaluate its edge-hover state immediately.
@@ -1429,7 +1414,9 @@ function App() {
 			prev === "shelf" ||
 			prev === "power" ||
 			prev === "wallpaper" ||
-			prev === "apps"
+			prev === "apps" ||
+			prev === "pomodoro" ||
+			prev === "tasks"
 				? shelfRestingModeRef.current
 				: prev
 		);
@@ -1470,13 +1457,7 @@ function App() {
 	};
 
 	const removeShelfItem = (id: string) => {
-		const next = shelfItems.filter((i) => i.id !== id);
-		setShelfItems(next);
-		if (next.length === 0) {
-			// Nothing left to show â€” fall back to status instead of an empty shelf.
-			clearShelfCollapse();
-			setBloomMode((mode) => (mode === "shelf" ? "status" : mode));
-		}
+		setShelfItems(shelfItems.filter((i) => i.id !== id));
 	};
 
 	// A full shelf never evicts silently: whatever fits is added and the rest
@@ -1524,11 +1505,11 @@ function App() {
 
 		const room = Math.max(0, SHELF_MAX_ITEMS - prev.length);
 		if (room === 0) {
-			showShelfNotice(`Shelf is full (${SHELF_MAX_ITEMS}) â€” remove an item first`);
+			showShelfNotice(`Shelf is full (${SHELF_MAX_ITEMS}) — remove an item first`);
 			return;
 		}
 		if (fresh.length > room) {
-			showShelfNotice(`Shelf is full â€” added ${room} of ${fresh.length} items`);
+			showShelfNotice(`Shelf is full — added ${room} of ${fresh.length} items`);
 		}
 		const added = fresh.slice(0, room);
 		markShelfNew(added.map((i) => i.id));
@@ -1539,7 +1520,7 @@ function App() {
 		const prev = shelfItemsRef.current;
 		if (prev.some((i) => i.type === "text" && i.text === text)) return;
 		if (prev.length >= SHELF_MAX_ITEMS) {
-			showShelfNotice(`Shelf is full (${SHELF_MAX_ITEMS}) â€” remove an item first`);
+			showShelfNotice(`Shelf is full (${SHELF_MAX_ITEMS}) — remove an item first`);
 			return;
 		}
 		const item: ShelfItem = {
@@ -1552,6 +1533,34 @@ function App() {
 		markShelfNew([item.id]);
 		setShelfItems([item, ...prev]);
 	};
+
+	// Clipboard → shelf: files and text as-is, images saved as PNG files.
+	const addShelfPaste = (paste: ShelfPaste) => {
+		if (paste.paths.length > 0) addShelfItems(paste.paths);
+		if (paste.text) addShelfText(paste.text);
+		setShelfTab("files");
+	};
+	const pasteIntoShelf = () => {
+		invoke<ShelfPaste>("clipboard_to_shelf", { id: null })
+			.then(addShelfPaste)
+			.catch((e) => showShelfNotice(String(e)));
+	};
+	const pasteIntoShelfRef = useRef(pasteIntoShelf);
+	pasteIntoShelfRef.current = pasteIntoShelf;
+	// Ctrl+V while the shelf is open pastes into it (inputs keep their paste).
+	useEffect(() => {
+		if (bloomMode !== "shelf") return;
+		const onKey = (e: KeyboardEvent) => {
+			const target = e.target as HTMLElement | null;
+			if (target?.closest("input, textarea, [contenteditable]")) return;
+			if (e.ctrlKey && e.key.toLowerCase() === "v") {
+				e.preventDefault();
+				pasteIntoShelfRef.current();
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [bloomMode]);
 
 	// Files open in their default app; text items are copied to the clipboard
 	// so they can be pasted anywhere. A file that no longer exists is reported
@@ -1572,7 +1581,7 @@ function App() {
 				// failure (e.g. no association) must not remove it.
 				const alive = await invoke<string[]>("shelf_prune", { paths: [path] }).catch(() => null);
 				if (alive && alive.length === 0) {
-					showShelfNotice("File no longer exists â€” removed from shelf");
+					showShelfNotice("File no longer exists — removed from shelf");
 					removeShelfItem(item.id);
 				} else {
 					showShelfNotice("Couldn't open the file");
@@ -1714,17 +1723,17 @@ function App() {
 		// When media is active or open, music comes first, followed by controls, calendar, apps, shelf, wallpaper, power
 		const hasActiveMedia = mediaInfo.has_media && settingsMusicModeEnabled;
 		const modes: BloomMode[] = hasActiveMedia
-			? ["music", "command-center", "calendar", "apps", "shelf", "wallpaper", "power"]
-			: ["status", "command-center", "calendar", "apps", "shelf", "wallpaper", "power"];
+			? ["music", "command-center", "calendar", "pomodoro", "tasks", "apps", "shelf", "wallpaper", "power"]
+			: ["status", "command-center", "calendar", "pomodoro", "tasks", "apps", "shelf", "wallpaper", "power"];
 		return modes.filter((m) => {
 			if (m === "power" && !settingsPowerModeEnabled) return false;
 			if (m === "wallpaper" && !settingsWallpaperModeEnabled) return false;
 			if (m === "music" && (!settingsMusicModeEnabled || !mediaInfo.has_media)) return false;
 			if (m === "calendar" && !settingsCalendarEnabled) return false;
+			if (m === "pomodoro" && !pomodoroEnabled) return false;
+			if (m === "tasks" && !tasksEnabled) return false;
 			if (m === "apps" && !settingsAppsEnabled) return false;
-			// Shelf only appears in the cycle while it holds something (or a
-			// drag is hovering); drag-enter forces it directly regardless.
-			if (m === "shelf" && shelfItems.length === 0 && !isDragHovering) return false;
+			// The shelf is always reachable: files you keep and recent copies.
 			return true;
 		});
 	};
@@ -2449,11 +2458,11 @@ function App() {
 					<div
 						className="passive-feature"
 						key="weather"
-						title={cityName ? `${weatherCondition} â€” ${cityName}` : weatherCondition}
+						title={cityName ? `${weatherCondition} — ${cityName}` : weatherCondition}
 					>
 						<WeatherIcon size={12} strokeWidth={2.2} />
 						<span className="label">
-							{temperature}Â°{tempUnit === "fahrenheit" ? "F" : "C"}
+							{temperature}°{tempUnit === "fahrenheit" ? "F" : "C"}
 						</span>
 					</div>
 				);
@@ -2498,11 +2507,11 @@ function App() {
 					>
 						<div className="net-stacked-lines">
 							<span className="net-stacked-row up">
-								<span className="net-stacked-arrow">â†‘</span>
+								<span className="net-stacked-arrow">↑</span>
 								<span className="net-stacked-val">{formatBytesCompact(netUpSpeed)}</span>
 							</span>
 							<span className="net-stacked-row down">
-								<span className="net-stacked-arrow">â†“</span>
+								<span className="net-stacked-arrow">↓</span>
 								<span className="net-stacked-val">{formatBytesCompact(netDownSpeed)}</span>
 							</span>
 						</div>
@@ -2564,6 +2573,12 @@ function App() {
 	// Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
 	const isMusicMode = mediaInfo.has_media && bloomMode === "music" && settingsMusicModeEnabled;
 	const showLyricsPanel = lyricsOpen && bloomMode === "music" && isHovered;
+	// Panels whose collapsed form is the plain 36px row can grow for the card;
+	// calendar, shelf and wallpaper keep their content while collapsed.
+	const showAudioCard =
+		!!audioToast &&
+		!isHovered &&
+		!["calendar", "shelf", "wallpaper", "announcement"].includes(bloomMode);
 	const showLyricsTicker =
 		lyricsOpen &&
 		!isHovered &&
@@ -2575,10 +2590,12 @@ function App() {
 	const getDynamicWidth = () => {
 		if (bloomMode === "announcement" && announcement && !announcementDismissed) return 380;
 		if (isCalendarMode) return 480;
-		if (bloomMode === "shelf") return 380;
+		if (bloomMode === "shelf") return 460;
 		if (bloomMode === "command-center" && isHovered) return 365;
 		if (bloomMode === "apps") return isHovered ? 530 : 140;
 		if (bloomMode === "power" && isHovered) return 360;
+		if (bloomMode === "pomodoro" && isHovered) return 560;
+		if (bloomMode === "tasks" && isHovered) return 540;
 		if (bloomMode === "wallpaper") return 860;
 		if (bloomMode === "status" && isHovered) {
 			const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
@@ -2588,9 +2605,11 @@ function App() {
 			const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
 			const widgetsWidth = Math.min(220 + totalWidgets * 45, 400);
 			const mediaWidth = mediaLayout === "compact" ? 340 : 365;
-			return Math.max(mediaWidth, widgetsWidth);
+			const lyricsWidth = showLyricsPanel && lyricsBeside ? LYRICS_SIDE_WIDTH : 0;
+			return Math.max(mediaWidth + lyricsWidth, widgetsWidth);
 		}
-		if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse || !!audioToast) && !isHovered) return 260;
+		if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 260;
+		if (showAudioCard) return 340;
 		if (showLyricsTicker) return 340;
 
 		let w = 140;
@@ -2605,14 +2624,18 @@ function App() {
 		if (bloomMode === "announcement" && announcement && !announcementDismissed) {
 			return announcement.url ? 168 : 148;
 		}
+		// The device card grows the collapsed notch in every panel mode.
+		if (showAudioCard) return 36 + AUDIO_CARD_HEIGHT;
 		// Sized to the calendar's week-row count plus the timer's fixed content.
 		if (bloomMode === "calendar") return calendarMonthRows >= 6 ? 305 : 273;
 		// Shelf expands on mode alone (no hover needed — there is no cursor
 		// hover during an OS drag) and is sized to exactly one row of tiles.
-		if (bloomMode === "shelf") return shelfItems.length > 0 ? 176 : 130;
-		if (bloomMode === "command-center") return isHovered ? (ccSubView === "wifi" || ccSubView === "performance" ? 400 : ccSubView === "bluetooth" ? 360 : 332) : 36;
+		if (bloomMode === "shelf") return showClipboardTab || shelfItems.length > 0 ? 210 : 170;
+		if (bloomMode === "command-center") return isHovered ? (ccSubView === "wifi" || ccSubView === "performance" ? 400 : ccSubView === "bluetooth" ? 360 : 346) : 36;
 		if (bloomMode === "apps") return isHovered ? 400 : 36;
 		if (bloomMode === "power") return isHovered ? 124 : 36;
+		if (bloomMode === "pomodoro") return isHovered ? 222 : 36;
+		if (bloomMode === "tasks") return isHovered ? 222 : 36;
 		if (bloomMode === "wallpaper") return 320;
 		if (showLyricsTicker) return 36 + LYRICS_TICKER_HEIGHT;
 		if (bloomMode === "status") return 36;
@@ -2622,7 +2645,7 @@ function App() {
 			if (mediaLayout === "compact" && compactVolumeExpanded) {
 				h += 38;
 			}
-			if (showLyricsPanel) {
+			if (showLyricsPanel && !lyricsBeside) {
 				h += LYRICS_PANEL_HEIGHT + 6;
 			}
 			return 36 + h;
@@ -2631,6 +2654,14 @@ function App() {
 	};
 
 	const isCalendarMode = bloomMode === "calendar";
+	// Dots for the roomier panels; dense ones (controls, apps, wallpaper) use
+	// their bottom edge for content.
+	const cyclableModes = getCyclableModes();
+	const showPanelDots =
+		isHovered &&
+		cyclableModes.length > 1 &&
+		cyclableModes.includes(bloomMode) &&
+		!["status", "command-center", "apps", "wallpaper"].includes(bloomMode);
 	// Arrows beside the time switch panels once the open notch has been clicked,
 	// for mice without a scroll wheel. Hover alone keeps the notch uncluttered.
 	const showPanelArrows =
@@ -2734,7 +2765,7 @@ function App() {
 					onHoverStart={() => {
 						cancelNotchClose();
 						setIsHovered(true);
-						// Shelf and announcement manage their own lifetime â€” hovering
+						// Shelf and announcement manage their own lifetime — hovering
 						// must not yank the island out from under them. Hovering the
 						// shelf also cancels its post-drop auto-close.
 						if (bloomMode === "shelf") {
@@ -2767,6 +2798,16 @@ function App() {
 					}}
 				>
 					{settingsGlassStyle && <GlassLayer anchor="top" scale={scale} />}
+					{showPanelDots && (
+						<PanelDots
+							count={cyclableModes.length}
+							index={cyclableModes.indexOf(bloomMode)}
+							onSelect={(i) => {
+								manualMusicRef.current = cyclableModes[i] === "music";
+								setBloomMode(cyclableModes[i]);
+							}}
+						/>
+					)}
 					<AnimatePresence>
 						{isMusicMode &&
 							settingsAmbienceEnabled &&
@@ -2822,26 +2863,9 @@ function App() {
 								>
 									<div className="main-row">
 												<AnimatePresence mode="wait">
-													{(showPowerPulse || showLowBatteryPulse || showUpdatePulse || !!audioToast) &&
+													{(showPowerPulse || showLowBatteryPulse || showUpdatePulse) &&
 													!isHovered ? (
-														audioToast ? (
-															<motion.div
-																key="audio-pulse-view"
-																initial={{ opacity: 0, scale: 0.95, filter: "blur(4px)" }}
-																animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-																exit={{ opacity: 0, scale: 1.05, filter: "blur(4px)" }}
-																className="power-pulse-content"
-															>
-																{audioToast.type === "headphone" ? (
-																	<Headphones size={13} strokeWidth={2.4} style={{ color: "#38bdf8" }} />
-																) : (
-																	<Mic size={13} strokeWidth={2.4} style={{ color: "#a78bfa" }} />
-																)}
-																<span className="label" style={{ color: "#f1f5f9" }}>
-																	{audioToast.message}
-																</span>
-															</motion.div>
-														) : showUpdatePulse ? (
+														showUpdatePulse ? (
 															<motion.div
 																key="update-pulse-view"
 																initial={{ opacity: 0, scale: 0.95, filter: "blur(4px)" }}
@@ -2877,7 +2901,7 @@ function App() {
 																		: isCharging
 																			? "Charging"
 																			: "On Battery"}{" "}
-																	â€¢ {batteryLevel}%
+																	• {batteryLevel}%
 																</span>
 															</motion.div>
 														)
@@ -2929,7 +2953,18 @@ function App() {
 																</AnimatePresence>
 																<div className="time-flip-container" onClick={toggleCalendarMode}>
 																	<AnimatePresence initial={false}>
-																		{timerSeconds > 0 || isTimerFinished ? (
+																		{pomodoroRunning && timerSeconds === 0 && !isTimerFinished ? (
+																			<motion.span
+																				key="pomodoro"
+																				className="time"
+																				initial={{ rotateX: -90, opacity: 0 }}
+																				animate={{ rotateX: 0, opacity: 1 }}
+																				exit={{ rotateX: 90, opacity: 0 }}
+																				transition={{ type: "spring", stiffness: 600, damping: 30 }}
+																			>
+																				<PomodoroCompact />
+																			</motion.span>
+																		) : timerSeconds > 0 || isTimerFinished ? (
 																			<motion.span
 																				key="timer"
 																				className={`time compact-timer ${isTimerFinished ? "timer-finished" : ""}`}
@@ -3007,7 +3042,12 @@ function App() {
 											</div>
 										</motion.div>
 
-								{showLyricsTicker && activeLyricText !== null && (
+								<AnimatePresence>
+									{showAudioCard && audioToast && (
+										<AudioDeviceCard key="audio-card" toast={audioToast} />
+									)}
+								</AnimatePresence>
+								{!showAudioCard && showLyricsTicker && activeLyricText !== null && (
 									<LyricsTicker text={activeLyricText} lineKey={activeLyricIndex} />
 								)}
 
@@ -3016,14 +3056,21 @@ function App() {
 									{bloomMode === "music" && isHovered && (
 										<motion.div
 											key="expanded-music"
-											className={`expanded-music-container ${showLyricsPanel ? "with-lyrics" : ""}`}
+											className={`expanded-music-container ${showLyricsPanel ? (lyricsBeside ? "with-lyrics-side" : "with-lyrics") : ""}`}
 											initial={{ opacity: 0, scale: 0.98 }}
 											animate={{ opacity: 1, scale: 1 }}
 											exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
 											transition={{ type: "spring", stiffness: 500, damping: 30 }}
 											onClick={(e) => e.stopPropagation()}
 										>
-											<div className="music-player-slot">
+											<div
+												className="music-player-slot"
+												style={
+													showLyricsPanel && lyricsBeside
+														? { width: (mediaLayout === "compact" ? 340 : 365) - 24 }
+														: undefined
+												}
+											>
 											{mediaLayout === "compact" ? (
 												<CompactMediaPlayer
 													lyricsOpen={lyricsOpen}
@@ -3300,6 +3347,7 @@ function App() {
 											</div>
 											{showLyricsPanel && (
 												<LyricsPanel
+													beside={lyricsBeside}
 													state={lyrics}
 													activeIndex={activeLyricIndex}
 													canSeek={mediaInfo.seek_enabled ?? false}
@@ -3316,6 +3364,8 @@ function App() {
 								<AnimatePresence>
 									{bloomMode === "command-center" && (
 										<ControlsView
+											outputDevice={audioDevices.output_device || audioDevices.headphone_name}
+											outputIsHeadphones={audioDevices.headphone_connected}
 											showSavings={notchControlSavings}
 												showEthernet={notchControlEthernet}
 											showDnd={notchControlDnd}
@@ -3454,7 +3504,7 @@ function App() {
 																: isTimerFinished
 																	? "Time's up"
 																	: timerEndTime
-																		? `${timerState === "paused" ? "Paused Â· " : ""}ends ${timerEndTime}`
+																		? `${timerState === "paused" ? "Paused · " : ""}ends ${timerEndTime}`
 																		: "Click to edit"}
 														</div>
 
@@ -3549,10 +3599,49 @@ function App() {
 											exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
 											transition={{ type: "spring", stiffness: 400, damping: 30 }}
 										>
+											<div className="shelf-header">
+												<span className="shelf-title">Shelf</span>
+												<div className="shelf-header-actions">
+													{!showClipboardTab && (
+														<button
+															type="button"
+															className="shelf-paste-btn"
+															onClick={pasteIntoShelf}
+															title="Add what's on the clipboard (Ctrl+V)"
+														>
+															<ClipboardPaste size={11} /> Paste
+														</button>
+													)}
+													{clipboardHistoryEnabled && (
+														<div className="shelf-tabs">
+															<button
+																type="button"
+																className={!showClipboardTab ? "active" : ""}
+																onClick={() => setShelfTab("files")}
+																title="Files"
+															>
+																<FolderOpen size={12} />
+															</button>
+															<button
+																type="button"
+																className={showClipboardTab ? "active" : ""}
+																onClick={() => setShelfTab("clipboard")}
+																title="Clipboard history"
+															>
+																<ClipboardIcon size={12} />
+															</button>
+														</div>
+													)}
+												</div>
+											</div>
 											{shelfNotice && <div className="shelf-notice">{shelfNotice}</div>}
-											{shelfItems.length === 0 ? (
-												<div className="shelf-empty">
-													<span>Drop files or selected text here</span>
+											{showClipboardTab ? (
+												<ClipboardList onPinToShelf={addShelfPaste} onWheel={handleShelfWheel} />
+											) : shelfItems.length === 0 ? (
+												<div className="shelf-dropzone">
+													<Inbox size={22} strokeWidth={1.7} />
+													<span>Drop files here</span>
+													<small>Or paste with Ctrl+V · drag out anytime</small>
 												</div>
 											) : (
 												<div className="shelf-items-grid" onWheel={handleShelfWheel}>
@@ -3615,7 +3704,7 @@ function App() {
 																	</div>
 																	<span className="shelf-tile-name">
 																		{item.type === "text"
-																			? `Text Â· ${item.text?.length ?? 0} chars`
+																			? `Text · ${item.text?.length ?? 0} chars`
 																			: item.name}
 																	</span>
 																	<button
@@ -3636,6 +3725,14 @@ function App() {
 											)}
 										</motion.div>
 									)}
+								</AnimatePresence>
+
+								{/* Pomodoro & Tasks Panels */}
+								<AnimatePresence>
+									{bloomMode === "pomodoro" && isHovered && <PomodoroView key="pomodoro" />}
+								</AnimatePresence>
+								<AnimatePresence>
+									{bloomMode === "tasks" && isHovered && <TasksView key="tasks" />}
 								</AnimatePresence>
 
 								{/* Power Panel */}

@@ -1,10 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod clipboard;
 mod commands;
 mod dock_extras;
 mod glass;
 mod lyrics;
 mod memory;
+mod package_icon;
 mod power;
 mod services;
 mod shelf;
@@ -61,7 +63,7 @@ fn main() {
         let err = GetLastError();
 
         if err.0 == 183 {
-            // Another instance is already running â€” signal it to open settings
+            // Another instance is already running — signal it to open settings
             if let Ok(h_event) = OpenEventW(
                 SYNCHRONIZATION_ACCESS_RIGHTS(0x00100002),
                 false,
@@ -227,10 +229,17 @@ fn main() {
             memory::optimize_memory,
             memory::close_heavy_app,
             lyrics::fetch_lyrics,
-            glass::get_glass_backdrop
+            glass::get_glass_backdrop,
+            clipboard::get_clipboard_history,
+            clipboard::clipboard_restore,
+            clipboard::clipboard_remove,
+            clipboard::clipboard_clear,
+            clipboard::set_clipboard_history_enabled,
+            clipboard::clipboard_to_shelf
         ])
         .setup(|app| {
             init_taskbar_marker(app.handle());
+            clipboard::start_monitor(app.handle().clone());
             // Populate the settings cache before anything else: a webview can
             // invoke save_setting as soon as it loads, which happens before the
             // rest of this hook runs.
@@ -337,7 +346,7 @@ fn main() {
 
             sync_overlays(app.handle());
 
-            // Initialize the overlay window â€” on Windows, set_position doesn't
+            // Initialize the overlay window — on Windows, set_position doesn't
             // take effect on a window that has never been shown. Show it once
             // to register it with the compositor, then hide immediately.
             if let Some(ov_win) = app.get_webview_window("overlay") {

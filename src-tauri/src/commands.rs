@@ -203,7 +203,7 @@ pub async fn init_dock(app: AppHandle, mode: String) {
     }
 
     if let Some(dock_win) = app.get_webview_window("dock") {
-        // 1. Always show first â€” idempotent, required before any positioning
+        // 1. Always show first — idempotent, required before any positioning
         let _ = dock_win.show();
         if let Ok(hwnd) = dock_win.hwnd() {
             re_assert_topmost(hwnd);
@@ -223,7 +223,7 @@ pub async fn init_dock(app: AppHandle, mode: String) {
                         return;
                     }
                     // Wait for monitor and window dimensions to be available.
-                    // Never use a hardcoded fallback â€” wrong values produce off-screen placement.
+                    // Never use a hardcoded fallback — wrong values produce off-screen placement.
                     // Extract HWND as isize before any await (raw pointer is not Send).
                     let hwnd_val = dock_clone.hwnd().map(|h| h.0 as isize).unwrap_or(0);
                     let ph = dock_clone
@@ -242,7 +242,7 @@ pub async fn init_dock(app: AppHandle, mode: String) {
                     if hwnd_val != 0 {
                         if let Some((m_size, m_pos)) = monitor_info {
                             if ph <= 10 {
-                                // outer_size() not ready yet â€” retry next tick
+                                // outer_size() not ready yet — retry next tick
                                 if attempt < 19 {
                                     tokio::time::sleep(tokio::time::Duration::from_millis(200))
                                         .await;
@@ -360,7 +360,7 @@ pub async fn change_dock_mode(app: AppHandle, mode: String) {
                 });
                 DOCK_APPBAR_REGISTERED.store(false, Ordering::Relaxed);
 
-                // Retry primary_monitor() â€” can fail on autostart before shell initializes
+                // Retry primary_monitor() — can fail on autostart before shell initializes
                 let dock_clone = dock_win.clone();
                 tauri::async_runtime::spawn(async move {
                     for attempt in 0..10 {
@@ -1081,9 +1081,20 @@ fn is_browser_host_process(path: &str) -> bool {
         || p.contains("firefox.exe")
 }
 
-/// Resolves the icon of a shell application id (Store/UWP/packaged PWA) through
-/// `shell:AppsFolder`. `SHGetFileInfoW` cannot handle these; `IShellItemImageFactory` can.
+/// Bumped when icon extraction changes so stale cached icons are re-extracted
+/// (v2: packaged apps read their logo from the package manifest).
+const ICON_CACHE_FILE: &str = "icons_cache_v2.json";
+
+/// Resolves the icon of a shell application id (Store/UWP/packaged PWA). Package
+/// apps (`Family!App`) read their logo from the package; anything else, or a
+/// package without a readable logo, goes through `shell:AppsFolder`, where
+/// `SHGetFileInfoW` cannot help but `IShellItemImageFactory` can.
 fn icon_from_aumid(aumid: &str) -> Option<String> {
+    if aumid.contains('!') {
+        if let Some(icon) = crate::package_icon::icon_for_aumid(aumid) {
+            return Some(icon);
+        }
+    }
     unsafe {
         use windows::Win32::Foundation::SIZE;
         use windows::Win32::UI::Shell::{
@@ -1208,6 +1219,9 @@ fn find_aumid_by_family(family: &str) -> Option<String> {
 /// Icon for executables that live inside an MSIX package (`\WindowsApps\...`).
 /// Those exes carry no app icon; the package manifest logo is the real icon.
 fn packaged_exe_icon(path: &str) -> Option<String> {
+    if let Some(icon) = crate::package_icon::icon_for_packaged_exe(path) {
+        return Some(icon);
+    }
     let family = package_family_from_windows_apps_path(path)?;
     match find_aumid_by_family(&family) {
         Some(aumid) => icon_from_aumid(&aumid),
@@ -1483,7 +1497,7 @@ pub fn schedule_icon_cache_save(app: AppHandle) {
         let last = LAST_ICON_SAVE_REQUEST.load(Ordering::Relaxed);
         if now == last || crate::utils::get_now_ms() - last >= 950 {
             if let Ok(dir) = app.path().app_config_dir() {
-                let cache_path = dir.join("icons_cache.json");
+                let cache_path = dir.join(ICON_CACHE_FILE);
                 if let Some(c) = crate::state::ICON_CACHE.get() {
                     let snapshot = if let Ok(lock) = c.lock() {
                         serde_json::to_string(&*lock).unwrap_or_default()
@@ -1510,7 +1524,7 @@ pub async fn get_app_icon(
     hwnd: Option<isize>,
 ) -> Result<Option<String>, String> {
     let cache_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    let cache_path = cache_dir.join("icons_cache.json");
+    let cache_path = cache_dir.join(ICON_CACHE_FILE);
     let cache_key = get_cache_key(&path, name.as_deref());
 
     // Strategy 0: Check for custom icon first
@@ -1819,7 +1833,7 @@ pub async fn load_pinned_apps(app: AppHandle) -> Vec<AppInfo> {
 #[tauri::command]
 pub async fn clear_icon_cache(app: AppHandle) -> Result<(), String> {
     let cache_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    let cache_path = cache_dir.join("icons_cache.json");
+    let cache_path = cache_dir.join(ICON_CACHE_FILE);
     let _ = std::fs::remove_file(&cache_path);
     if let Some(c) = ICON_CACHE.get() {
         if let Ok(mut lock) = c.lock() {
@@ -3036,7 +3050,7 @@ pub async fn capture_window_thumbnail(
     .map_err(|e| e.to_string())
 }
 
-// â”€â”€ Radio helpers â€” Windows Runtime Windows.Devices.Radios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Radio helpers — Windows Runtime Windows.Devices.Radios ───────────────────
 // Replaces PowerShell -ExecutionPolicy Bypass scripts for WiFi/Bluetooth state.
 
 fn get_radio_state_sync(kind: windows::Devices::Radios::RadioKind) -> Result<bool, String> {
@@ -3144,7 +3158,7 @@ pub fn get_brightness() -> u32 {
     crate::state::CURRENT_BRIGHTNESS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-// â”€â”€ Wi-Fi status â€” WLAN API for association state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Wi-Fi status — WLAN API for association state ────────────────────────────
 // The radio state only says Wi-Fi is on, not whether it is connected, so the
 // notch quick settings needs a second bit to distinguish "on" from "connected".
 
@@ -3225,7 +3239,7 @@ pub async fn set_bluetooth_state(enabled: bool) -> Result<(), String> {
     .map_err(|e| e.to_string())?
 }
 
-// Settings openers â€” use ShellExecuteA directly instead of spawning powershell
+// Settings openers — use ShellExecuteA directly instead of spawning powershell
 
 #[tauri::command]
 pub fn open_bluetooth_settings() {
@@ -3339,7 +3353,7 @@ pub fn set_brightness(app: AppHandle, brightness: u32) {
 
 #[tauri::command]
 pub async fn get_battery_saver_state() -> Result<bool, String> {
-    // Uses Windows Runtime PowerManager â€” no PowerShell required.
+    // Uses Windows Runtime PowerManager — no PowerShell required.
     tauri::async_runtime::spawn_blocking(|| {
         unsafe {
             let _ = windows::Win32::System::Com::CoInitializeEx(
@@ -4016,7 +4030,7 @@ pub fn reset_settings(app: AppHandle) -> Result<(), String> {
     }
 
     // Keep non-Bloom keys (the file is user-editable) and the first-run/version
-    // sentinels (lifecycle markers, not preferences â€” keeping them avoids
+    // sentinels (lifecycle markers, not preferences — keeping them avoids
     // replaying the splash after a reset). Everything else falls back to
     // defaults in both the backend and the frontends.
     let keep = ["bloom-first-run", "bloom-app-version"];
@@ -4152,7 +4166,7 @@ pub fn setup_settings_watcher(app: AppHandle) {
                             *cache = new_settings.clone();
                             (changed, removed)
                         };
-                        // Lock dropped â€” safe to emit without blocking save_setting
+                        // Lock dropped — safe to emit without blocking save_setting
                         for (key, value) in &changed {
                             let _ = app.emit(
                                 "settings-external-changed",

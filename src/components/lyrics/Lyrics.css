@@ -170,3 +170,25 @@
 	min-height: 0;
 	width: 100%;
 }
+
+/* Lyrics beside the player (horizontal layout) */
+.expanded-music-container.with-lyrics-side {
+	flex-direction: row;
+	gap: 14px;
+}
+
+.expanded-music-container.with-lyrics-side .music-player-slot {
+	flex: 0 0 auto;
+}
+
+.lyrics-panel.beside {
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+	padding: 0 4px 0 12px;
+	border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lyrics-panel.beside .lyrics-line {
+	font-size: 13.5px;
+}

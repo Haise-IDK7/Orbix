@@ -1,4 +1,7 @@
 import {
+	MicVocal,
+	ListChecks,
+	ClipboardList,
 	PanelTop,
 	Calendar,
 	BellRing,
@@ -22,6 +25,7 @@ import {
 	Headphones
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { useStoredSetting } from "../hooks/useStoredSetting";
 import { StatusWidgetConfig } from "../components/StatusWidgetConfig";
 import type { WidgetConfig } from "./types";
 
@@ -137,6 +141,10 @@ export function NotchTab({
 	statusWidgets,
 	handleWidgetsChange
 }: NotchTabProps) {
+	const [lyricsLayout, setLyricsLayout] = useStoredSetting("bloom-lyrics-layout", "vertical");
+	const [pomodoroEnabled, setPomodoroEnabled] = useStoredSetting("bloom-pomodoro-enabled", "true");
+	const [tasksEnabled, setTasksEnabled] = useStoredSetting("bloom-tasks-enabled", "true");
+	const [clipboardHistory, setClipboardHistory] = useStoredSetting("bloom-clipboard-history", "true");
 	return (
 		<>
 			<div className="setting-group-label">Notch</div>
@@ -178,6 +186,28 @@ export function NotchTab({
 				<SettingRow icon={Calendar} label="Calendar & Timer" desc="Enable productivity split-view">
 					<label className="toggle-switch">
 						<input type="checkbox" checked={calendarEnabled} onChange={toggleCalendar} />
+						<span className="slider"></span>
+					</label>
+				</SettingRow>
+
+				<SettingRow icon={Timer} label="Pomodoro" desc="Focus sessions with breaks and rounds">
+					<label className="toggle-switch">
+						<input
+							type="checkbox"
+							checked={pomodoroEnabled !== "false"}
+							onChange={() => setPomodoroEnabled(pomodoroEnabled === "false" ? "true" : "false")}
+						/>
+						<span className="slider"></span>
+					</label>
+				</SettingRow>
+
+				<SettingRow icon={ListChecks} label="Tasks" desc="Small to-do list for today">
+					<label className="toggle-switch">
+						<input
+							type="checkbox"
+							checked={tasksEnabled !== "false"}
+							onChange={() => setTasksEnabled(tasksEnabled === "false" ? "true" : "false")}
+						/>
 						<span className="slider"></span>
 					</label>
 				</SettingRow>
@@ -257,6 +287,23 @@ export function NotchTab({
 							</div>
 						</SettingRow>
 
+						<SettingRow icon={MicVocal} label="Lyrics Layout" desc="Lyrics below the player or beside it">
+							<div className="unit-toggle-minimal wide">
+								<span
+									className={lyricsLayout !== "horizontal" ? "active" : ""}
+									onClick={() => setLyricsLayout("vertical")}
+								>
+									Vertical
+								</span>
+								<span
+									className={lyricsLayout === "horizontal" ? "active" : ""}
+									onClick={() => setLyricsLayout("horizontal")}
+								>
+									Horizontal
+								</span>
+							</div>
+						</SettingRow>
+
 						<SettingRow
 							icon={Sparkles}
 							label="Ambient Glow"
@@ -289,14 +336,25 @@ export function NotchTab({
 
 			<div className="setting-group-label">Shelf</div>
 			<div className="setting-group">
+				<SettingRow icon={Archive} label="Keep Items" desc="Keep shelf items after Orbix closes">
+					<label className="toggle-switch">
+						<input type="checkbox" checked={shelfPersist} onChange={toggleShelfPersist} />
+						<span className="slider"></span>
+					</label>
+				</SettingRow>
+
 				<SettingRow
-					icon={Archive}
-					label="Keep Items"
-					desc="Keep shelf items after Bloom closes"
+					icon={ClipboardList}
+					label="Clipboard History"
+					desc="Recent copies in the shelf. Kept in memory only; private copies (password managers) are skipped"
 					divider={false}
 				>
 					<label className="toggle-switch">
-						<input type="checkbox" checked={shelfPersist} onChange={toggleShelfPersist} />
+						<input
+							type="checkbox"
+							checked={clipboardHistory !== "false"}
+							onChange={() => setClipboardHistory(clipboardHistory === "false" ? "true" : "false")}
+						/>
 						<span className="slider"></span>
 					</label>
 				</SettingRow>

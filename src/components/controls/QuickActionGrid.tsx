@@ -9,6 +9,7 @@ import {
 	SunMedium,
 	Bell,
 	AppWindow,
+	Gauge,
 } from "lucide-react";
 
 interface QuickActionGridProps {
@@ -37,6 +38,10 @@ interface QuickActionGridProps {
 	onOpenNotificationCenter: () => void;
 	onOpenNightLightSettings: () => void;
 	onOpenSystemTray?: (e: React.MouseEvent) => void;
+
+	/** Physical memory in use, 0–100; null until the first reading. */
+	ramPercent: number | null;
+	onOpenPerformance: () => void;
 }
 
 export const QuickActionGrid: React.FC<QuickActionGridProps> = React.memo(({
@@ -65,6 +70,8 @@ export const QuickActionGrid: React.FC<QuickActionGridProps> = React.memo(({
 	onOpenNotificationCenter,
 	onOpenNightLightSettings,
 	onOpenSystemTray,
+	ramPercent,
+	onOpenPerformance,
 }) => {
 	return (
 		<div className="cc-actions-grid">
@@ -149,6 +156,23 @@ export const QuickActionGrid: React.FC<QuickActionGridProps> = React.memo(({
 					<span className="cc-action-name">Saver</span>
 				</button>
 			)}
+
+			{/* Performance: RAM load at a glance, opens the Performance panel */}
+			<button
+				type="button"
+				className={`cc-action-tile cc-perf-tile ${ramPercent !== null && ramPercent >= 85 ? "high" : ""}`}
+				onClick={(e) => {
+					e.stopPropagation();
+					onOpenPerformance();
+				}}
+				title="Performance • Free up RAM and close heavy apps"
+			>
+				<Gauge size={14} />
+				<span className="cc-action-name">{ramPercent === null ? "RAM" : `RAM ${ramPercent}%`}</span>
+				{ramPercent !== null && (
+					<span className="cc-perf-tile-bar" style={{ width: `${ramPercent}%` }} />
+				)}
+			</button>
 
 			{/* Screen Snip */}
 			<button

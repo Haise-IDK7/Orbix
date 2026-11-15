@@ -182,7 +182,7 @@
 /* ---------------- Quick Action Grid ---------------- */
 .cc-actions-grid {
 	display: grid;
-	grid-template-columns: repeat(4, 1fr);
+	grid-template-columns: repeat(5, 1fr);
 	gap: 5px;
 	margin-bottom: 6px;
 }
@@ -971,4 +971,40 @@
 	background: rgba(248, 113, 113, 0.22);
 	border-color: rgba(248, 113, 113, 0.5);
 	color: #fecaca;
+}
+
+/* Performance tile: a thin RAM gauge along the bottom edge */
+.cc-perf-tile {
+	position: relative;
+	overflow: hidden;
+}
+
+.cc-perf-tile-bar {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	height: 2px;
+	background: #34d399;
+	transition: width 0.4s ease;
+}
+
+.cc-perf-tile.high .cc-perf-tile-bar {
+	background: #f87171;
+}
+
+/* Current audio output, above the volume slider */
+.cc-output-device {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 10.5px;
+	color: #94a3b8;
+	padding: 0 2px;
+	min-width: 0;
+}
+
+.cc-output-device span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
