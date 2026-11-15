@@ -49,6 +49,10 @@
 - [x] Settings → Notch: translation engines panel
 - [x] README: What's New section, new screenshots, network use table, fork download
 
+### Round 7: translate button stuck on "…"
+- [x] Timeouts on every on-device step (8 s / 20 s) and on the whole translation (60 s); on-device failure disables it for the session
+- [x] On-device translator is opt-in (experimental); MyMemory is the default again
+
 ### Previous
 
 - [x] Task 1: Backend Non-Recursive Direct Folder Scanning (`src-tauri/src/wallpaper.rs`)

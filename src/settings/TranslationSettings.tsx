@@ -6,9 +6,9 @@ import { onDeviceTranslatorPresent } from "../components/lyrics/onDeviceTranslat
 import { useStoredSetting } from "../hooks/useStoredSetting";
 
 /**
- * Which engines translate lyrics, in order: the on-device translator (no
- * limit, when this PC's WebView2 has it), Microsoft Translator with the
- * user's free key (2M characters/month), then MyMemory (~5,000/day).
+ * Which engines translate lyrics: Microsoft Translator with the user's free
+ * key (2M characters/month) if saved, else MyMemory (~5,000/day, the
+ * default). The translator built into WebView2 is an opt-in experiment.
  */
 export function TranslationSettings() {
 	const [email, setEmail] = useStoredSetting("bloom-translate-email", "");
@@ -18,6 +18,8 @@ export function TranslationSettings() {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const onDevice = onDeviceTranslatorPresent();
+	const [useOnDevice, setUseOnDevice] = useStoredSetting("bloom-translate-on-device", "false");
+	const deviceOn = onDevice && useOnDevice === "true";
 
 	useEffect(() => {
 		invoke<string | null>("translator_key_status")
@@ -50,16 +52,26 @@ export function TranslationSettings() {
 			</div>
 
 			<div className="translation-engine">
-				<span className={`spotify-badge ${onDevice ? "on" : ""}`}>
-					{onDevice ? "Ready" : "Not here"}
+				<span className={`spotify-badge ${deviceOn ? "on" : ""}`}>
+					{!onDevice ? "Not here" : deviceOn ? "On" : "Off"}
 				</span>
 				<div>
-					<strong>1. On this PC (no limit)</strong>
+					<strong>1. On this PC (experimental, no limit)</strong>
 					<p>
 						{onDevice
-							? "Uses the translator built into Microsoft Edge/WebView2. The first song in a language downloads its model once."
-							: "Needs a newer WebView2 (version 148 or later). Windows updates it automatically; until then the engines below are used."}
+							? "Uses the translator built into Microsoft Edge/WebView2. Off by default: on some PCs Windows offers it but never finishes loading its model. If it doesn't answer, Orbix switches to the engines below for the rest of the session."
+							: "Needs a newer WebView2 (version 148 or later). Until then the engines below are used."}
 					</p>
+					{onDevice && (
+						<label className="toggle-switch">
+							<input
+								type="checkbox"
+								checked={useOnDevice === "true"}
+								onChange={() => setUseOnDevice(useOnDevice === "true" ? "false" : "true")}
+							/>
+							<span className="slider"></span>
+						</label>
+					)}
 				</div>
 			</div>
 
@@ -120,9 +132,9 @@ export function TranslationSettings() {
 			</div>
 
 			<div className="translation-engine">
-				<span className="spotify-badge on">Always</span>
+				<span className="spotify-badge on">Default</span>
 				<div>
-					<strong>3. MyMemory (fallback)</strong>
+					<strong>3. MyMemory (default)</strong>
 					<p>
 						No sign-up, about 5,000 characters a day (2–3 songs). An email raises it to 50,000; it's
 						sent only to MyMemory.

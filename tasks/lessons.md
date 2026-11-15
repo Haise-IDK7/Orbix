@@ -4,6 +4,11 @@
 
 ## Patterns
 
+### 2026-11-15 — Unbounded await on a platform API
+- **What happened**: The lyrics translate button stayed on "…" forever: WebView2 exposed the built-in Translator API but its model never finished loading, and the code awaited it with no limit.
+- **Root cause**: Shipped an untested-on-target API as the first engine, with no timeout and no fallback path for "never resolves".
+- **Rule**: Every await on an external or experimental API gets a timeout and a fallback; features that can't be verified on the user's machine ship opt-in, not as the default.
+
 ### 2026-11-15 — Feature hidden until fully set up looked broken
 - **What happened**: The Spotify heart only rendered after the user connected a Spotify developer app, so the user saw nothing and reported it as not working.
 - **Root cause**: Gated the control's visibility on its prerequisites instead of showing it with a path to set it up.

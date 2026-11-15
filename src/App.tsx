@@ -927,6 +927,7 @@ function App() {
 	// lyrics button and remembered across songs.
 	const [lyricsTranslate, setLyricsTranslate] = useStoredSetting("bloom-lyrics-translate", "false");
 	const [lyricsTarget] = useStoredSetting("bloom-lyrics-translate-to", "es");
+	const [translateOnDevice] = useStoredSetting("bloom-translate-on-device", "false");
 	const lyricsSourceLines = useMemo(
 		() =>
 			lyrics.status === "synced"
@@ -939,7 +940,8 @@ function App() {
 	const lyricsTranslation = useLyricsTranslation(
 		lyricsSourceLines,
 		lyricsOpen && lyricsTranslate === "true",
-		lyricsTarget
+		lyricsTarget,
+		translateOnDevice === "true"
 	);
 	const translateButton =
 		lyricsOpen && lyricsSourceLines.length > 0 ? (

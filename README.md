@@ -99,7 +99,7 @@ The standard Windows desktop shell has remained largely static for decades:
     </td>
     <td align="center">
       <img src="assets/screenshots/orbix-settings-translation.png" alt="Lyrics translation engines in Settings" width="100%" />
-      <br /><strong>Translation engines</strong><br /><sub>On-device first, then Microsoft Translator, then MyMemory</sub>
+      <br /><strong>Translation engines</strong><br /><sub>MyMemory by default, Microsoft Translator with your key, on-device as an experiment</sub>
     </td>
   </tr>
 </table>
@@ -113,7 +113,7 @@ The standard Windows desktop shell has remained largely static for decades:
 ### Notch
 - **Lock screen**: a full-screen clock with widgets, shown after a chosen idle time (skipped while a video or full-screen app keeps the display on) or from Orbix's Lock buttons. Ten-plus typefaces, size and weight, color from the wallpaper (or white / custom), and four looks: **Depth** (on-device subject cut-out in front of the clock), **Frosted glass**, **Blend**, or plain digits. Widgets: date, weather, month calendar, battery, now playing, tasks. Enter or a click outside the widgets hands over to the Windows PIN; **Go Straight to PIN** skips Windows' own lock picture.
 - **Lyrics**: live synced lyrics from LRCLIB, vertical (below the player) or horizontal (beside it), with a one-line ticker under the collapsed notch. Click a line to jump there.
-- **Lyric translation**: a button beside the lyrics button adds the translation under each line (Spanish by default; English, Portuguese, French, German or Italian). Engines, in order: the translator built into WebView2/Edge (runs on your PC, no limit), Microsoft Translator with your own free key (2 million characters a month), then MyMemory (about 5,000 characters a day). Choruses are sent once and each song is cached.
+- **Lyric translation**: a button beside the lyrics button adds the translation under each line (Spanish by default; English, Portuguese, French, German or Italian). By default it uses MyMemory (about 5,000 characters a day, 50,000 with an email); with your own free Microsoft Translator key it switches to that (2 million characters a month). The translator built into WebView2/Edge (on your PC, no limit) is an experimental opt-in, since some WebView2 versions never finish loading its model. Choruses are sent once and each song is cached.
 - **Spotify like button**: a heart in both player layouts saves the song to your Liked Songs. Connect your own Spotify developer app in Settings → Notch → Spotify (its owner needs Premium).
 - **Control center**: cleaner layout; the Wi-Fi tile shows your network name, the Bluetooth tile shows the connected device and its battery.
   - **Wi-Fi**: native scan and connect. Windows 11 24H2+ only shows nearby networks to apps with location on, so the panel lists which of the three location switches is off and refreshes on its own once they are on.
@@ -328,7 +328,7 @@ Orbix only goes online for features you turn on or use:
 | --- | --- | --- |
 | Weather | Open-Meteo (and IP location if no city is set) | Coordinates |
 | Lyrics | LRCLIB | Song title, artist, duration |
-| Lyric translation | On-device first; else Microsoft Translator (your key) or MyMemory | Lyric lines of the current song (plus your optional email for MyMemory) |
+| Lyric translation | MyMemory, or Microsoft Translator with your key (on-device if you enable it) | Lyric lines of the current song (plus your optional email for MyMemory) |
 | Spotify like button | Spotify Web API (your own app) | Currently playing track, like/unlike |
 | Updates | GitHub Releases of upstream Lukog10/Orbix | Version check (off unless enabled) |
 
