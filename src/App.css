@@ -2423,5 +2423,5 @@ img {
 	white-space: nowrap;
 	overflow: hidden;
 	margin-right: 8px;
-	text-transform: capitalize;
+	font-variant-numeric: tabular-nums;
 }

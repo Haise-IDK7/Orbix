@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
@@ -7,6 +8,8 @@ import {
 	CloudSun,
 	Clock,
 	Eye,
+	KeyRound,
+	Blend,
 	Image,
 	Layers,
 	ListChecks,
@@ -100,6 +103,29 @@ export function LockScreenTab() {
 	const [weight, setWeight] = useStoredSetting("bloom-lock-weight", "600");
 	const [size, setSize] = useStoredSetting("bloom-lock-size", "100");
 	const [style, setStyle] = useStoredSetting("bloom-lock-style", "depth");
+	const [fusion, setFusion] = useStoredSetting(
+		"bloom-lock-fusion",
+		style === "solid" ? "false" : "true"
+	);
+	const [skipCurtain, setSkipCurtain] = useState<boolean | null>(null);
+	const [curtainError, setCurtainError] = useState("");
+
+	useEffect(() => {
+		invoke<boolean>("lock_curtain_skipped")
+			.then(setSkipCurtain)
+			.catch(() => setSkipCurtain(false));
+	}, []);
+
+	const toggleCurtain = () => {
+		const next = !skipCurtain;
+		setCurtainError("");
+		invoke<boolean>("set_lock_curtain_skipped", { skip: next })
+			.then((state) => {
+				setSkipCurtain(state);
+				if (state !== next) setCurtainError("Windows didn't apply the change");
+			})
+			.catch((e) => setCurtainError(String(e)));
+	};
 	const [colorMode, setColorMode] = useStoredSetting("bloom-lock-color-mode", "auto");
 	const [color, setColor] = useStoredSetting("bloom-lock-color", "#ffffff");
 	const [position, setPosition] = useStoredSetting("bloom-lock-position", "top");
@@ -153,9 +179,27 @@ export function LockScreenTab() {
 							<Toggle value={onLock} onChange={setOnLock} />
 						</SettingRow>
 						<SettingRow
+							icon={KeyRound}
+							label="Go Straight to PIN"
+							desc={
+								curtainError ||
+								"Skips Windows' own lock picture after this page (whole PC, asks for admin approval)"
+							}
+						>
+							<label className="toggle-switch">
+								<input
+									type="checkbox"
+									checked={!!skipCurtain}
+									disabled={skipCurtain === null}
+									onChange={toggleCurtain}
+								/>
+								<span className="slider"></span>
+							</label>
+						</SettingRow>
+						<SettingRow
 							icon={Eye}
 							label="Preview"
-							desc="Opens it without locking the PC; move the mouse to close"
+							desc="Opens it without locking the PC; press Enter or click to close"
 							action
 							divider={false}
 							onClick={() => invoke("show_lock_screen", { preview: true }).catch(console.error)}
@@ -211,18 +255,26 @@ export function LockScreenTab() {
 							</div>
 						</div>
 						<div className="setting-divider" />
-						<SettingRow icon={Layers} label="Effect" desc="How the clock meets the wallpaper">
-							<select
-								className="settings-select"
-								value={style}
-								onChange={(e) => setStyle(e.target.value)}
-							>
-								<option value="depth">Depth (subject in front)</option>
-								<option value="glass">Frosted glass</option>
-								<option value="blend">Blend</option>
-								<option value="solid">Solid</option>
-							</select>
+						<SettingRow
+							icon={Blend}
+							label="Fuse With Wallpaper"
+							desc="Off shows plain digits over the image"
+						>
+							<Toggle value={fusion} onChange={setFusion} />
 						</SettingRow>
+						{fusion !== "false" && (
+							<SettingRow icon={Layers} label="Effect" desc="How the clock meets the wallpaper">
+								<select
+									className="settings-select"
+									value={style === "solid" ? "depth" : style}
+									onChange={(e) => setStyle(e.target.value)}
+								>
+									<option value="depth">Depth (subject in front)</option>
+									<option value="glass">Frosted glass</option>
+									<option value="blend">Blend</option>
+								</select>
+							</SettingRow>
+						)}
 						<SettingRow icon={Palette} label="Color" desc="Auto picks a tint from the wallpaper">
 							<div className="lock-wallpaper-actions">
 								{colorMode === "custom" && (

@@ -25,8 +25,8 @@ interface MediaInfo {
 
 /** Input this soon after showing is the click/keypress that opened it. */
 const GRACE_MS = 900;
-/** Pointer travel that counts as "someone is here" (ignores desk bumps). */
-const MOVE_THRESHOLD_PX = 24;
+/** Clicks on these don't unlock. */
+const WIDGET_SELECTOR = ".ls-widget, .ls-media";
 
 const useBool = (key: string, fallback: boolean) => {
 	const [value] = useStoredSetting(key, String(fallback));
@@ -89,7 +89,14 @@ export const LockScreen: React.FC = () => {
 	const [fontId] = useStoredSetting("bloom-lock-font", "oswald");
 	const [weight] = useStoredSetting("bloom-lock-weight", "600");
 	const [size] = useStoredSetting("bloom-lock-size", "100");
-	const [style] = useStoredSetting("bloom-lock-style", "depth");
+	const [storedStyle] = useStoredSetting("bloom-lock-style", "depth");
+	// "Fuse with wallpaper" off = plain digits. Older installs stored "solid"
+	// as the style itself, so that still means off.
+	const [fusion] = useStoredSetting(
+		"bloom-lock-fusion",
+		storedStyle === "solid" ? "false" : "true"
+	);
+	const style = fusion === "false" ? "solid" : storedStyle === "solid" ? "depth" : storedStyle;
 	const [colorMode] = useStoredSetting("bloom-lock-color-mode", "auto");
 	const [customColor] = useStoredSetting("bloom-lock-color", "#ffffff");
 	const [position] = useStoredSetting("bloom-lock-position", "top");
@@ -113,7 +120,6 @@ export const LockScreen: React.FC = () => {
 	const subjectHost = useRef<HTMLDivElement>(null);
 	const subjectCache = useRef<{ key: string; canvas: HTMLCanvasElement } | null>(null);
 	const shownAt = useRef(0);
-	const pointerStart = useRef<{ x: number; y: number } | null>(null);
 	const now = useNow();
 
 	// Media keeps flowing to this (hidden) window, so the card is current.
@@ -137,7 +143,6 @@ export const LockScreen: React.FC = () => {
 	useEffect(() => {
 		const unlisten = listen<boolean>("lockscreen-show", () => {
 			shownAt.current = Date.now();
-			pointerStart.current = null;
 			setTasks(readTasks());
 			loadWallpaper();
 			(navigator as any)
@@ -197,7 +202,9 @@ export const LockScreen: React.FC = () => {
 
 	useEffect(() => {
 		if (!visible) return;
-		const onKey = () => dismiss();
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === "Enter") dismiss();
+		};
 		const onBlur = () => window.setTimeout(dismiss, 50);
 		window.addEventListener("keydown", onKey);
 		window.addEventListener("blur", onBlur);
@@ -235,19 +242,8 @@ export const LockScreen: React.FC = () => {
 	return (
 		<div
 			className={`ls-root ${visible ? "visible" : ""}`}
-			onPointerDown={dismiss}
-			onWheel={dismiss}
-			onPointerMove={(e) => {
-				if (!pointerStart.current) {
-					pointerStart.current = { x: e.clientX, y: e.clientY };
-					return;
-				}
-				if (
-					Math.hypot(e.clientX - pointerStart.current.x, e.clientY - pointerStart.current.y) >
-					MOVE_THRESHOLD_PX
-				) {
-					dismiss();
-				}
+			onPointerDown={(e) => {
+				if (e.button === 0 && !(e.target as Element).closest(WIDGET_SELECTOR)) dismiss();
 			}}
 			style={{ "--ls-blur": blurUrl ? `url("${blurUrl}")` : "none" } as React.CSSProperties}
 		>
@@ -364,7 +360,7 @@ export const LockScreen: React.FC = () => {
 				)}
 			</AnimatePresence>
 
-			{visible && <div className="ls-hint">Press any key to unlock</div>}
+			{visible && <div className="ls-hint">Press Enter or click to unlock</div>}
 		</div>
 	);
 };

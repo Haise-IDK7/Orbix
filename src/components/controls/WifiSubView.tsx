@@ -1,11 +1,25 @@
 ﻿import React, { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronLeft, RotateCw, Lock, Check } from "lucide-react";
+import { ChevronLeft, RotateCw, Lock, Check, X, Wifi } from "lucide-react";
 import { SignalBarsIcon } from "./Icons";
 import { WifiNetworkEntry } from "./types";
 
 // Must match wifi::LOCATION_PERMISSION_ERROR in src-tauri/src/wifi.rs.
 const LOCATION_PERMISSION_ERROR = "LOCATION_PERMISSION_REQUIRED";
+/** While blocked, re-check this often so the list appears as soon as access is on. */
+const LOCATION_RECHECK_MS = 3000;
+
+interface LocationAccess {
+	services: boolean;
+	apps: boolean;
+	desktop_apps: boolean;
+}
+
+const LOCATION_STEPS: { key: keyof LocationAccess; label: string }[] = [
+	{ key: "services", label: "Location services" },
+	{ key: "apps", label: "Let apps access your location" },
+	{ key: "desktop_apps", label: "Let desktop apps access your location" }
+];
 
 interface WifiSubViewProps {
 	wifiEnabled: boolean;
@@ -18,7 +32,7 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 	wifiEnabled,
 	onToggleWifi,
 	onBack,
-	currentSsid,
+	currentSsid
 }) => {
 	const [networks, setNetworks] = useState<WifiNetworkEntry[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -48,13 +62,35 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 		scanNetworks();
 	}, [scanNetworks]);
 
+	const [location, setLocation] = useState<LocationAccess | null>(null);
+	const blocked = scanError === LOCATION_PERMISSION_ERROR;
+	// Windows only shares nearby networks with location access on. Show which
+	// switch is off and keep checking, so flipping it in Settings is enough.
+	useEffect(() => {
+		if (!blocked) return;
+		const check = () => {
+			invoke<LocationAccess>("get_location_access")
+				.then(setLocation)
+				.catch(() => {});
+			invoke<WifiNetworkEntry[]>("get_available_wifi_networks")
+				.then((list) => {
+					setNetworks(list);
+					setScanError(null);
+				})
+				.catch(() => {});
+		};
+		check();
+		const id = window.setInterval(check, LOCATION_RECHECK_MS);
+		return () => window.clearInterval(id);
+	}, [blocked]);
+
 	const handleConnect = async (ssid: string) => {
 		setConnecting(true);
 		setConnectError(null);
 		try {
 			const success = await invoke<boolean>("connect_wifi_network", {
 				ssid,
-				password: password || undefined,
+				password: password || undefined
 			});
 			if (success) {
 				setSelectedSsid(null);
@@ -138,13 +174,30 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 						<RotateCw size={18} className="spinning" />
 						<span>Scanning nearby networks...</span>
 					</div>
-				) : scanError === LOCATION_PERMISSION_ERROR ? (
-					<div className="cc-subview-empty">
-						<p>
-							Windows hides nearby networks from apps
-							<br />
-							while location access is off.
+				) : blocked ? (
+					<div className="cc-location-help">
+						{currentSsid && (
+							<div className="cc-network-row connected cc-current-network">
+								<Wifi size={14} />
+								<span className="cc-network-name">{currentSsid}</span>
+								<span className="cc-network-badge">Connected</span>
+							</div>
+						)}
+						<p className="cc-location-text">
+							Windows only shows nearby networks to apps with location on. Turn these on and the
+							list appears here:
 						</p>
+						<ul className="cc-location-steps">
+							{LOCATION_STEPS.map(({ key, label }) => {
+								const on = location?.[key];
+								return (
+									<li key={key} className={on ? "on" : on === false ? "off" : ""}>
+										{on ? <Check size={12} /> : <X size={12} />}
+										<span>{label}</span>
+									</li>
+								);
+							})}
+						</ul>
 						<button
 							type="button"
 							className="cc-subview-primary-btn"
@@ -154,16 +207,6 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 							}}
 						>
 							Open location settings
-						</button>
-						<button
-							type="button"
-							className="cc-subview-ghost-btn"
-							onClick={(e) => {
-								e.stopPropagation();
-								scanNetworks();
-							}}
-						>
-							Scan Again
 						</button>
 					</div>
 				) : networks.length === 0 ? (
@@ -183,7 +226,9 @@ export const WifiSubView: React.FC<WifiSubViewProps> = ({
 				) : (
 					<div className="cc-networks-list">
 						{networks.map((net) => {
-							const isConnected = net.is_connected || (currentSsid && net.ssid.toLowerCase() === currentSsid.toLowerCase());
+							const isConnected =
+								net.is_connected ||
+								(currentSsid && net.ssid.toLowerCase() === currentSsid.toLowerCase());
 							const isSelected = selectedSsid === net.ssid;
 
 							return (

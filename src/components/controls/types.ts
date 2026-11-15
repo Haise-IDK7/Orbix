@@ -7,6 +7,8 @@ export interface InternetStatus {
 	ethernet_connected: boolean;
 	wifi_connected: boolean;
 	wifi_enabled: boolean;
+	/** Connected Wi-Fi network, also while Ethernet is the main connection. */
+	wifi_ssid?: string;
 }
 
 export interface WifiNetworkEntry {
@@ -44,4 +46,19 @@ export interface OptimizeResult {
 
 export interface CloseAppResult {
 	remaining: number;
+}
+
+export interface BtDevice {
+	id: string;
+	name: string;
+	/** "audio", "input", "phone", "computer" or "other". */
+	kind: string;
+	connected: boolean;
+	/** Orbix can connect/disconnect it (Bluetooth audio). */
+	can_toggle: boolean;
+}
+
+export interface BtOverview {
+	enabled: boolean;
+	devices: BtDevice[];
 }

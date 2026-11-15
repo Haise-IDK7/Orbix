@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { Effect } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { X, Settings, Palette, PanelTop, Monitor, Layers, Info, Megaphone, Lock } from "lucide-react";
 import {
@@ -39,6 +40,16 @@ function SettingsApp() {
 
 	useEffect(() => {
 		return initTheme();
+	}, []);
+
+	// Other windows can ask for a tab (e.g. the notch's heart → Spotify setup).
+	useEffect(() => {
+		const unlisten = listen<SettingsTab>("settings-open-tab", (e) => {
+			if (TABS.some((t) => t.id === e.payload)) setActiveTab(e.payload);
+		});
+		return () => {
+			unlisten.then((f) => f());
+		};
 	}, []);
 
 	useEffect(() => {

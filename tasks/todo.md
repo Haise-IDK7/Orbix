@@ -31,6 +31,13 @@
 - [x] Date in the expanded notch
 - [x] Audio toast: diff all active outputs, not just the default device
 
+### Round 4: fixes from testing
+- [x] Notch date as dd/mm
+- [x] Spotify heart always visible; setup/unavailable states lead to the fix
+- [x] Lock screen: Enter/click to unlock, fusion on/off, keep in front, "Go Straight to PIN" (NoLockScreen)
+- [x] Wi-Fi: physical-only Ethernet detection, SSID from connection profile, location checklist with auto re-check
+- [x] Bluetooth: paired device list, connect/disconnect audio (KS one-shot), Add device, connected name on tile
+
 ### Previous
 
 - [x] Task 1: Backend Non-Recursive Direct Folder Scanning (`src-tauri/src/wallpaper.rs`)

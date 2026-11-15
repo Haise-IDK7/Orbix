@@ -935,7 +935,7 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
 }
 
 /// Reads one string property of an audio endpoint.
-unsafe fn endpoint_string(
+pub(crate) unsafe fn endpoint_string(
     store: &windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore,
     key: &windows::Win32::Foundation::PROPERTYKEY,
 ) -> Option<String> {

@@ -216,3 +216,21 @@
 .like-btn.liked {
 	color: #1ed760;
 }
+
+/* Not usable yet (Spotify not connected, song not on Spotify): dimmer, but
+   still clickable so it leads to the fix. */
+.like-btn.like-setup,
+.like-btn.like-unavailable {
+	color: rgba(255, 255, 255, 0.3);
+}
+
+.like-btn.like-loading {
+	color: rgba(255, 255, 255, 0.4);
+	animation: like-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes like-pulse {
+	50% {
+		opacity: 0.45;
+	}
+}

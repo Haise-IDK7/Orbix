@@ -3053,7 +3053,7 @@ pub async fn capture_window_thumbnail(
 // ── Radio helpers — Windows Runtime Windows.Devices.Radios ───────────────────
 // Replaces PowerShell -ExecutionPolicy Bypass scripts for WiFi/Bluetooth state.
 
-fn get_radio_state_sync(kind: windows::Devices::Radios::RadioKind) -> Result<bool, String> {
+pub(crate) fn get_radio_state_sync(kind: windows::Devices::Radios::RadioKind) -> Result<bool, String> {
     use windows::Devices::Radios::{Radio, RadioState};
     unsafe {
         let _ = windows::Win32::System::Com::CoInitializeEx(
@@ -3178,7 +3178,13 @@ fn is_ethernet_connected_sync() -> bool {
                 // Type 6 = IF_TYPE_ETHERNET_CSMACD
                 // OperStatus: IfOperStatusUp = 1
                 // MediaConnectState: MediaConnectStateConnected = 1
-                if row.Type == 6 && row.OperStatus.0 == 1 && row.MediaConnectState.0 == 1 {
+                // Flags: bit 0 HardwareInterface, bit 1 FilterInterface, bit 2
+                // ConnectorPresent. Virtual adapters (Hyper-V/WSL vEthernet,
+                // VPNs, VirtualBox) are always "up" and have no connector;
+                // counting them reported "Ethernet" on Wi-Fi-only PCs.
+                let flags = row.InterfaceAndOperStatusFlags._bitfield;
+                let physical = flags & 0b101 == 0b101 && flags & 0b010 == 0;
+                if row.Type == 6 && physical && row.OperStatus.0 == 1 && row.MediaConnectState.0 == 1 {
                     connected = true;
                     break;
                 }
@@ -4639,7 +4645,7 @@ pub async fn get_internet_status() -> Result<InternetStatus, String> {
         let (connection_type, label, is_connected) = if ethernet_connected {
             ("ethernet".to_string(), "Ethernet".to_string(), true)
         } else if wifi_connected {
-            let display_ssid = if ssid.is_empty() { "Wi-Fi".to_string() } else { ssid };
+            let display_ssid = if ssid.is_empty() { "Wi-Fi".to_string() } else { ssid.clone() };
             ("wifi".to_string(), display_ssid, true)
         } else {
             ("offline".to_string(), "No internet".to_string(), false)
@@ -4652,6 +4658,7 @@ pub async fn get_internet_status() -> Result<InternetStatus, String> {
             ethernet_connected,
             wifi_connected,
             wifi_enabled,
+            wifi_ssid: ssid,
         })
     })
     .await
@@ -4665,6 +4672,12 @@ pub async fn get_available_wifi_networks() -> Result<Vec<WifiNetworkEntry>, Stri
     tauri::async_runtime::spawn_blocking(crate::wifi::scan_networks)
         .await
         .map_err(|e| e.to_string())?
+}
+
+/// Location switches that gate Wi-Fi scans, so the panel can say which to flip.
+#[tauri::command]
+pub fn get_location_access() -> crate::wifi::LocationAccess {
+    crate::wifi::location_access()
 }
 
 #[tauri::command]

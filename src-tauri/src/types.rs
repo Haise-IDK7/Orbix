@@ -135,6 +135,9 @@ pub struct InternetStatus {
     pub ethernet_connected: bool,
     pub wifi_connected: bool,
     pub wifi_enabled: bool,
+    /// Connected Wi-Fi network, also while Ethernet is the main connection.
+    #[serde(default)]
+    pub wifi_ssid: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

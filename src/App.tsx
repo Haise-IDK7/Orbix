@@ -2662,7 +2662,7 @@ function App() {
 		// Shelf expands on mode alone (no hover needed — there is no cursor
 		// hover during an OS drag) and is sized to exactly one row of tiles.
 		if (bloomMode === "shelf") return showClipboardTab || shelfItems.length > 0 ? 210 : 170;
-		if (bloomMode === "command-center") return isHovered ? (ccSubView === "wifi" || ccSubView === "performance" ? 400 : ccSubView === "bluetooth" ? 360 : 320) : 36;
+		if (bloomMode === "command-center") return isHovered ? (ccSubView === "wifi" || ccSubView === "performance" || ccSubView === "bluetooth" ? 400 : 320) : 36;
 		if (bloomMode === "apps") return isHovered ? 400 : 36;
 		if (bloomMode === "power") return isHovered ? 124 : 36;
 		if (bloomMode === "pomodoro") return isHovered ? 222 : 36;
@@ -2685,11 +2685,10 @@ function App() {
 	};
 
 	const isCalendarMode = bloomMode === "calendar";
-	// Short weekday/day/month in the user's locale ("dom 15 nov"), beside the
-	// clock while the notch is open. Re-evaluated with each clock tick.
-	const notchDate = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" })
-		.format(new Date())
-		.replace(/[,.]/g, "");
+	// Compact dd/mm beside the clock while the notch is open; a weekday or
+	// month name crowds the status row. Re-evaluated with each clock tick.
+	const today = new Date();
+	const notchDate = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}`;
 	// Dots for the roomier panels; dense ones (controls, apps, wallpaper) use
 	// their bottom edge for content.
 	const cyclableModes = getCyclableModes();
@@ -3123,7 +3122,7 @@ function App() {
 											>
 											{mediaLayout === "compact" ? (
 												<CompactMediaPlayer
-													like={spotifyLike.available ? spotifyLike : undefined}
+													like={mediaInfo.has_media ? spotifyLike : undefined}
 													lyricsOpen={lyricsOpen}
 													onToggleLyrics={toggleLyrics}
 													mediaInfo={mediaInfo}
@@ -3226,8 +3225,13 @@ function App() {
 																		<Visualizer isPlaying={isPlaying} bars={5} height={18} />
 																	)}
 																</div>
-																{spotifyLike.available && (
-																	<LikeButton liked={spotifyLike.liked} onToggle={spotifyLike.toggle} />
+																{mediaInfo.has_media && (
+																	<LikeButton
+																		liked={spotifyLike.liked}
+																		onToggle={spotifyLike.toggle}
+																		status={spotifyLike.status}
+																		hint={spotifyLike.hint}
+																	/>
 																)}
 																<button
 																	type="button"

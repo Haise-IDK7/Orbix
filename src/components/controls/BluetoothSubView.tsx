@@ -1,5 +1,17 @@
-﻿import React from "react";
-import { ChevronLeft, Bluetooth, ExternalLink } from "lucide-react";
+﻿import React, { useCallback, useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import {
+	Bluetooth,
+	ChevronLeft,
+	ExternalLink,
+	Headphones,
+	Laptop,
+	Mouse,
+	Plus,
+	RotateCw,
+	Smartphone
+} from "lucide-react";
+import type { BtDevice, BtOverview } from "./types";
 
 interface BluetoothSubViewProps {
 	bluetoothEnabled: boolean;
@@ -8,15 +20,104 @@ interface BluetoothSubViewProps {
 	onOpenSettings: () => void;
 }
 
+/** Device list refresh while the panel is open (connections change on their own). */
+const REFRESH_MS = 4000;
+/** Bluetooth audio needs a moment to (dis)connect before the state flips. */
+const SETTLE_MS = 2500;
+
+const KIND_ICONS: Record<string, typeof Bluetooth> = {
+	audio: Headphones,
+	input: Mouse,
+	phone: Smartphone,
+	computer: Laptop
+};
+
 export const BluetoothSubView: React.FC<BluetoothSubViewProps> = ({
 	bluetoothEnabled,
 	onToggleBluetooth,
 	onBack,
-	onOpenSettings,
+	onOpenSettings
 }) => {
+	const [devices, setDevices] = useState<BtDevice[] | null>(null);
+	const [busy, setBusy] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	const refresh = useCallback(() => {
+		invoke<BtOverview>("bluetooth_devices")
+			.then((o) => setDevices(o.devices))
+			.catch(() => setDevices([]));
+	}, []);
+
+	useEffect(() => {
+		if (!bluetoothEnabled) {
+			setDevices(null);
+			return;
+		}
+		refresh();
+		const id = window.setInterval(refresh, REFRESH_MS);
+		return () => window.clearInterval(id);
+	}, [bluetoothEnabled, refresh]);
+
+	const toggleDevice = (dev: BtDevice) => {
+		setBusy(dev.id);
+		setError(null);
+		invoke("bluetooth_set_connected", { name: dev.name, connected: !dev.connected })
+			.then(() => new Promise((r) => window.setTimeout(r, SETTLE_MS)))
+			.catch((e) => setError(String(e)))
+			.finally(() => {
+				setBusy(null);
+				refresh();
+			});
+	};
+
+	const connected = devices?.filter((d) => d.connected) ?? [];
+	const others = devices?.filter((d) => !d.connected) ?? [];
+
+	const row = (dev: BtDevice) => {
+		const Icon = KIND_ICONS[dev.kind] ?? Bluetooth;
+		const isBusy = busy === dev.id;
+		return (
+			<div key={dev.id} className={`cc-bt-row ${dev.connected ? "connected" : ""}`}>
+				<div className="cc-bt-row-icon">
+					<Icon size={14} />
+				</div>
+				<div className="cc-bt-row-text">
+					<span className="cc-bt-row-name">{dev.name}</span>
+					<span className="cc-bt-row-status">
+						{isBusy
+							? dev.connected
+								? "Disconnecting…"
+								: "Connecting…"
+							: dev.connected
+								? "Connected"
+								: "Paired"}
+					</span>
+				</div>
+				{dev.can_toggle && (
+					<button
+						type="button"
+						className={`cc-bt-row-btn ${dev.connected ? "" : "primary"}`}
+						disabled={busy !== null}
+						onClick={(e) => {
+							e.stopPropagation();
+							toggleDevice(dev);
+						}}
+					>
+						{isBusy ? (
+							<RotateCw size={11} className="spinning" />
+						) : dev.connected ? (
+							"Disconnect"
+						) : (
+							"Connect"
+						)}
+					</button>
+				)}
+			</div>
+		);
+	};
+
 	return (
 		<div className="cc-subview-container">
-			{/* Header */}
 			<div className="cc-subview-header">
 				<button
 					type="button"
@@ -45,37 +146,60 @@ export const BluetoothSubView: React.FC<BluetoothSubViewProps> = ({
 				</div>
 			</div>
 
-			{/* Body */}
 			<div className="cc-subview-body">
-				<div className="cc-subview-bt-card">
-					<div className="cc-subview-bt-icon-row">
-						<div className={`cc-subview-bt-icon-box ${bluetoothEnabled ? "active" : ""}`}>
-							<Bluetooth size={20} />
-						</div>
-						<div>
-							<h4 className="cc-subview-bt-title">
-								{bluetoothEnabled ? "Bluetooth is On" : "Bluetooth is Off"}
-							</h4>
-							<p className="cc-subview-bt-subtitle">
-								{bluetoothEnabled
-									? "Your PC is discoverable by nearby devices"
-									: "Turn on Bluetooth to connect wireless devices"}
-							</p>
+				{!bluetoothEnabled ? (
+					<div className="cc-subview-empty">
+						<p>Bluetooth is off</p>
+						<button
+							type="button"
+							className="cc-subview-primary-btn"
+							onClick={(e) => {
+								e.stopPropagation();
+								onToggleBluetooth();
+							}}
+						>
+							Turn On
+						</button>
+					</div>
+				) : devices === null ? (
+					<div className="cc-subview-loading">
+						<RotateCw size={18} className="spinning" />
+						<span>Looking for your devices…</span>
+					</div>
+				) : (
+					<div className="cc-bt-list">
+						{error && <p className="cc-bt-error">{error}</p>}
+						{connected.length > 0 && <span className="cc-bt-section">Connected</span>}
+						{connected.map(row)}
+						{others.length > 0 && <span className="cc-bt-section">My devices</span>}
+						{others.map(row)}
+						{devices.length === 0 && <p className="cc-bt-empty">No paired devices yet.</p>}
+						<div className="cc-bt-actions">
+							<button
+								type="button"
+								className="cc-bt-action"
+								onClick={(e) => {
+									e.stopPropagation();
+									invoke("bluetooth_add_device").catch(console.error);
+								}}
+							>
+								<Plus size={13} />
+								<span>Add device</span>
+							</button>
+							<button
+								type="button"
+								className="cc-bt-action"
+								onClick={(e) => {
+									e.stopPropagation();
+									onOpenSettings();
+								}}
+							>
+								<ExternalLink size={12} />
+								<span>Settings</span>
+							</button>
 						</div>
 					</div>
-
-					<button
-						type="button"
-						className="cc-subview-settings-link"
-						onClick={(e) => {
-							e.stopPropagation();
-							onOpenSettings();
-						}}
-					>
-						<span>Manage Bluetooth in Windows Settings</span>
-						<ExternalLink size={13} />
-					</button>
-				</div>
+				)}
 			</div>
 		</div>
 	);

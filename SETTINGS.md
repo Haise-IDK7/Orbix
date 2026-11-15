@@ -154,12 +154,13 @@ Example:
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `bloom-lock-enabled` | `"true"` / `"false"` | `"true"` | Orbix lock screen. Any input hands over to the Windows lock (`LockWorkStation`). |
+| `bloom-lock-enabled` | `"true"` / `"false"` | `"true"` | Orbix lock screen. Enter or a click outside the widgets hands over to the Windows lock (`LockWorkStation`). "Go Straight to PIN" sets the machine policy `NoLockScreen` (not stored here). |
 | `bloom-lock-idle` | minutes string | `"5"` | Show after this long without input; `"0"` = never. Skipped while video or a full-screen app keeps the display on. |
 | `bloom-lock-on-lock` | `"true"` / `"false"` | `"true"` | Orbix's Lock buttons show this page first. |
 | `bloom-lock-wallpaper` | file path | `""` | Background image; empty = desktop wallpaper. |
 | `bloom-lock-font` | font id | `"oswald"` | Clock typeface (lock fonts + notch fonts). |
 | `bloom-lock-weight` / `bloom-lock-size` | integer string | `"600"` / `"100"` | Clock weight (variable fonts) and size in percent (60 to 150). |
+| `bloom-lock-fusion` | `"true"` / `"false"` | `"true"` | Fuse the clock with the wallpaper using `bloom-lock-style`; off = plain digits. |
 | `bloom-lock-style` | `"depth"` / `"glass"` / `"blend"` / `"solid"` | `"depth"` | How the clock meets the wallpaper. Depth draws the wallpaper's subject in front (on-device segmentation). |
 | `bloom-lock-color-mode` / `bloom-lock-color` | `"auto"` / `"white"` / `"custom"`, hex | `"auto"`, `"#ffffff"` | Clock color; auto derives it from the wallpaper. |
 | `bloom-lock-position` | `"top"` / `"center"` | `"top"` | Clock position. |

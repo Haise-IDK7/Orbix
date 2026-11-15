@@ -1,24 +1,34 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Heart } from "lucide-react";
+import type { LikeStatus } from "./useSpotifyLike";
 
 interface LikeButtonProps {
 	liked: boolean;
 	onToggle: () => void;
+	status?: LikeStatus;
+	hint?: string;
 	size?: number;
 }
 
 /** Spotify "Liked Songs" toggle with a small pop when liking. */
-export const LikeButton: React.FC<LikeButtonProps> = ({ liked, onToggle, size = 15 }) => (
+export const LikeButton: React.FC<LikeButtonProps> = ({
+	liked,
+	onToggle,
+	status = "ready",
+	hint,
+	size = 15
+}) => (
 	<motion.button
 		type="button"
-		className={`like-btn ${liked ? "liked" : ""}`}
+		className={`like-btn ${liked ? "liked" : ""} ${status !== "ready" ? `like-${status}` : ""}`}
 		onClick={(e) => {
 			e.stopPropagation();
 			onToggle();
 		}}
 		whileTap={{ scale: 0.85 }}
-		title={liked ? "Remove from Liked Songs" : "Save to Liked Songs"}
+		title={hint ?? (liked ? "Remove from Liked Songs" : "Save to Liked Songs")}
+		aria-label={hint}
 	>
 		<motion.span
 			key={liked ? "on" : "off"}

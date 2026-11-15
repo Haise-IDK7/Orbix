@@ -8,7 +8,9 @@
 //! Windows 11 24H2+ treats Wi-Fi scan results and SSIDs as location data: if
 //! "Let desktop apps access your location" is off, the scan list and the
 //! current SSID come back as ERROR_ACCESS_DENIED. Association state from
-//! `WlanEnumInterfaces` is still readable, so "connected" never depends on it.
+//! `WlanEnumInterfaces` is still readable, so "connected" never depends on it,
+//! and the network name falls back to the connection profile, which Windows
+//! doesn't treat as location data.
 
 use crate::types::WifiNetworkEntry;
 use windows::core::PCWSTR;
@@ -180,11 +182,90 @@ pub fn snapshot() -> WlanSnapshot {
         }
         if state == wlan_interface_state_connected {
             snap.connected = true;
-            snap.ssid = client.current_ssid(&guid).unwrap_or_default();
+            snap.ssid = client
+                .current_ssid(&guid)
+                .ok()
+                .filter(|s| !s.is_empty())
+                .or_else(profile_network_name)
+                .unwrap_or_default();
             break;
         }
     }
     snap
+}
+
+/// Name of the connected Wi-Fi network from its connection profile: the SSID
+/// when Windows shares it, otherwise the profile name (the SSID it was saved
+/// under). Neither needs location access.
+fn profile_network_name() -> Option<String> {
+    use windows::Networking::Connectivity::{NetworkConnectivityLevel, NetworkInformation};
+    let profiles = NetworkInformation::GetConnectionProfiles().ok()?;
+    for profile in profiles {
+        if !profile.IsWlanConnectionProfile().unwrap_or(false)
+            || profile.GetNetworkConnectivityLevel().ok() == Some(NetworkConnectivityLevel::None)
+        {
+            continue;
+        }
+        let ssid = profile
+            .WlanConnectionProfileDetails()
+            .and_then(|d| d.GetConnectedSsid())
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let name = if ssid.is_empty() {
+            profile.ProfileName().map(|s| s.to_string()).unwrap_or_default()
+        } else {
+            ssid
+        };
+        if !name.is_empty() {
+            return Some(name);
+        }
+    }
+    None
+}
+
+/// Which of Windows' location switches are on. Wi-Fi scans need all three.
+#[derive(serde::Serialize)]
+pub struct LocationAccess {
+    /// Settings → Privacy & security → Location → Location services.
+    pub services: bool,
+    /// "Let apps access your location".
+    pub apps: bool,
+    /// "Let desktop apps access your location".
+    pub desktop_apps: bool,
+}
+
+fn consent_value(root: windows::Win32::System::Registry::HKEY, subkey: &str) -> Option<String> {
+    use windows::Win32::System::Registry::{RegGetValueW, RRF_RT_REG_SZ};
+    let key = to_wide(subkey);
+    let name = to_wide("Value");
+    let mut buf = [0u16; 32];
+    let mut size = std::mem::size_of_val(&buf) as u32;
+    let status = unsafe {
+        RegGetValueW(
+            root,
+            PCWSTR(key.as_ptr()),
+            PCWSTR(name.as_ptr()),
+            RRF_RT_REG_SZ,
+            None,
+            Some(buf.as_mut_ptr() as *mut _),
+            Some(&mut size),
+        )
+    };
+    status.is_ok().then(|| wide_to_string(&buf))
+}
+
+/// Reads the location consent switches (missing values count as on, which is
+/// Windows' default).
+pub fn location_access() -> LocationAccess {
+    use windows::Win32::System::Registry::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    const KEY: &str =
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location";
+    let allowed = |v: Option<String>| v.is_none_or(|v| !v.eq_ignore_ascii_case("Deny"));
+    LocationAccess {
+        services: allowed(consent_value(HKEY_LOCAL_MACHINE, KEY)),
+        apps: allowed(consent_value(HKEY_CURRENT_USER, KEY)),
+        desktop_apps: allowed(consent_value(HKEY_CURRENT_USER, &format!(r"{KEY}\NonPackaged"))),
+    }
 }
 
 /// Merges per-interface/per-profile duplicates into one row per SSID.
@@ -239,8 +320,10 @@ pub fn scan_networks() -> Result<Vec<WifiNetworkEntry>, String> {
     }
     for (guid, state) in &interfaces {
         if *state != wlan_interface_state_not_ready {
-            unsafe {
-                let _ = WlanScan(client.0, guid, None, None, None);
+            // Denied here means the list will be too; answer at once so the
+            // panel can re-check every few seconds while the user fixes it.
+            if unsafe { WlanScan(client.0, guid, None, None, None) } == ERROR_ACCESS_DENIED {
+                return Err(LOCATION_PERMISSION_ERROR.to_string());
             }
         }
     }

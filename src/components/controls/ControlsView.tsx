@@ -19,7 +19,7 @@ import { ControlsFooter } from "./ControlsFooter";
 import { WifiSubView } from "./WifiSubView";
 import { PerformanceSubView } from "./PerformanceSubView";
 import { BluetoothSubView } from "./BluetoothSubView";
-import { InternetStatus, MicrophoneState, SubViewMode } from "./types";
+import { BtOverview, InternetStatus, MicrophoneState, SubViewMode } from "./types";
 import "./ControlsView.css";
 
 interface ControlsViewProps {
@@ -117,6 +117,7 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 	const [internetStatus, setInternetStatus] = useState<InternetStatus | null>(null);
 	const [microphoneState, setMicrophoneState] = useState<MicrophoneState | null>(null);
 	const [ramPercent, setRamPercent] = useState<number | null>(null);
+	const [btConnected, setBtConnected] = useState<string[]>([]);
 
 	// Local slider states for instant 0ms latency dragging
 	const [localVol, setLocalVol] = useState(volume);
@@ -148,6 +149,10 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 
 		invoke<number>("get_ram_usage")
 			.then((ram) => setRamPercent(Math.round(ram)))
+			.catch(() => {});
+
+		invoke<BtOverview>("bluetooth_devices")
+			.then((o) => setBtConnected(o.devices.filter((d) => d.connected).map((d) => d.name)))
 			.catch(() => {});
 
 		try {
@@ -217,7 +222,15 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 							<SplitPillCard
 								icon={<Wifi size={15} />}
 								title="Wi-Fi"
-								status={!wifiEnabled ? "Off" : wifiConnected ? (internetStatus?.label || "Connected") : "Not connected"}
+								status={
+									!wifiEnabled
+										? "Off"
+										: wifiConnected
+											? internetStatus?.wifi_ssid || "Connected"
+											: internetStatus?.ethernet_connected
+												? "Ethernet"
+												: "Not connected"
+								}
 								isActive={wifiEnabled}
 								onToggle={onToggleWifi}
 								onOpenSubView={() => updateSubView("wifi")}
@@ -229,7 +242,15 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 							<SplitPillCard
 								icon={<Bluetooth size={15} />}
 								title="Bluetooth"
-								status={bluetoothEnabled ? "On" : "Off"}
+								status={
+									!bluetoothEnabled
+										? "Off"
+										: btConnected.length === 0
+											? "Not connected"
+											: btConnected.length === 1
+												? btConnected[0]
+												: `${btConnected[0]} +${btConnected.length - 1}`
+								}
 								isActive={bluetoothEnabled}
 								onToggle={onToggleBluetooth}
 								onOpenSubView={() => updateSubView("bluetooth")}
@@ -418,7 +439,7 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 							wifiEnabled={wifiEnabled}
 							onToggleWifi={onToggleWifi}
 							onBack={() => updateSubView("main")}
-							currentSsid={internetStatus?.connection_type === "wifi" ? internetStatus.label : undefined}
+							currentSsid={internetStatus?.wifi_ssid || undefined}
 						/>
 					</motion.div>
 				) : subView === "performance" ? (

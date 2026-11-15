@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod bluetooth;
 mod clipboard;
 mod commands;
 mod dock_extras;
@@ -173,6 +174,7 @@ fn main() {
             capture_window_thumbnail,
             get_wifi_status,
             get_internet_status,
+            get_location_access,
             get_available_wifi_networks,
             connect_wifi_network,
             open_location_settings,
@@ -246,7 +248,12 @@ fn main() {
             spotify::spotify_set_liked,
             lockscreen::show_lock_screen,
             lockscreen::dismiss_lock_screen,
-            lockscreen::get_lock_wallpaper
+            lockscreen::lock_curtain_skipped,
+            lockscreen::set_lock_curtain_skipped,
+            lockscreen::get_lock_wallpaper,
+            bluetooth::bluetooth_devices,
+            bluetooth::bluetooth_set_connected,
+            bluetooth::bluetooth_add_device
         ])
         .setup(|app| {
             init_taskbar_marker(app.handle());

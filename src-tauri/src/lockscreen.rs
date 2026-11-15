@@ -2,10 +2,14 @@
 //! idle or when locking from Orbix.
 //!
 //! Windows does not let apps draw on its real lock screen (a separate secure
-//! desktop), so this page sits in front of the normal desktop instead. To stay
-//! safe, any interaction with it — or anything that takes focus away from it —
+//! desktop), so this page sits in front of the normal desktop instead. Enter or
+//! a click outside the widgets — or anything that takes focus away from it —
 //! hands over to the real Windows lock (`LockWorkStation`), which asks for the
 //! PIN. Preview mode (from Settings) just closes without locking.
+//!
+//! Windows shows its own lock picture before the PIN box; the only switch for
+//! that is the machine-wide `NoLockScreen` policy, which Settings can set (it
+//! needs administrator approval).
 
 use base64::Engine;
 use serde::Serialize;
@@ -18,8 +22,9 @@ const MAX_WALLPAPER_EDGE: u32 = 2560;
 
 static SHOWING: AtomicBool = AtomicBool::new(false);
 static PREVIEW: AtomicBool = AtomicBool::new(false);
-/// GetTickCount value when the page appeared.
-static SHOWN_AT: AtomicU32 = AtomicU32::new(0);
+/// The page has been the foreground window since it last appeared. Losing
+/// that afterwards means someone switched away (Alt+Tab, Win key).
+static WAS_FOREGROUND: AtomicBool = AtomicBool::new(false);
 /// Last-input tick already "used" by a show or dismiss. The idle timer only
 /// fires again after new input, so it can't reopen the page behind the
 /// Windows lock it just handed over to.
@@ -91,7 +96,7 @@ pub fn show(app: &AppHandle, preview: bool) -> Result<(), String> {
         return Ok(());
     }
     PREVIEW.store(preview, Ordering::SeqCst);
-    SHOWN_AT.store(tick_count(), Ordering::SeqCst);
+    WAS_FOREGROUND.store(false, Ordering::SeqCst);
     if let Some(input) = last_input_tick() {
         HANDLED_INPUT.store(input, Ordering::SeqCst);
     }
@@ -114,6 +119,9 @@ pub fn show(app: &AppHandle, preview: bool) -> Result<(), String> {
     let _ = win.show();
     let _ = win.set_always_on_top(true);
     let _ = win.set_focus();
+    if let Ok(hwnd) = win.hwnd() {
+        force_foreground(hwnd);
+    }
     let _ = app.emit_to(LABEL, "lockscreen-show", preview);
     Ok(())
 }
@@ -142,8 +150,34 @@ pub fn dismiss(app: &AppHandle) {
     }
 }
 
-/// Shows the page after the configured idle time, and treats any input made
-/// while it shows (even if another window kept keyboard focus) as a dismiss.
+/// Windows refuses SetForegroundWindow to background apps (the idle case);
+/// joining the current foreground thread's input queue lifts that, so Enter
+/// reaches the page instead of whatever app was in front.
+fn force_foreground(hwnd: windows::Win32::Foundation::HWND) {
+    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow,
+    };
+    unsafe {
+        let foreground = GetForegroundWindow();
+        if foreground == hwnd {
+            return;
+        }
+        let ours = GetCurrentThreadId();
+        let theirs = GetWindowThreadProcessId(foreground, None);
+        let attached =
+            theirs != 0 && theirs != ours && AttachThreadInput(ours, theirs, true).as_bool();
+        let _ = BringWindowToTop(hwnd);
+        let _ = SetForegroundWindow(hwnd);
+        if attached {
+            let _ = AttachThreadInput(ours, theirs, false);
+        }
+    }
+}
+
+/// Shows the page after the configured idle time. While it shows, keeps it in
+/// front, and locks if something else takes the foreground (Alt+Tab, Win key)
+/// — the page itself only closes on Enter or a click.
 pub fn start_idle_watch(app: AppHandle) {
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_secs(2));
@@ -151,13 +185,18 @@ pub fn start_idle_watch(app: AppHandle) {
             continue;
         };
         if SHOWING.load(Ordering::SeqCst) {
-            // Ignore input in the first second (the click/keypress that showed it).
-            let shown_at = SHOWN_AT.load(Ordering::SeqCst);
-            if last_input.wrapping_sub(shown_at) < u32::MAX / 2
-                && last_input.wrapping_sub(shown_at) > 1000
-            {
+            let Some(hwnd) = app.get_webview_window(LABEL).and_then(|w| w.hwnd().ok()) else {
+                continue;
+            };
+            let foreground =
+                unsafe { windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow() };
+            if foreground == hwnd {
+                WAS_FOREGROUND.store(true, Ordering::SeqCst);
+            } else if WAS_FOREGROUND.load(Ordering::SeqCst) {
                 let handle = app.clone();
                 let _ = app.run_on_main_thread(move || dismiss(&handle));
+            } else {
+                force_foreground(hwnd);
             }
             continue;
         }
@@ -184,6 +223,83 @@ pub fn show_lock_screen(app: AppHandle, preview: bool) -> Result<(), String> {
 #[tauri::command]
 pub fn dismiss_lock_screen(app: AppHandle) {
     dismiss(&app);
+}
+
+const PERSONALIZATION_POLICY: &str = r"SOFTWARE\Policies\Microsoft\Windows\Personalization";
+
+/// Whether Windows skips its lock picture and opens the PIN box directly
+/// (machine policy `NoLockScreen` = 1).
+#[tauri::command]
+pub fn lock_curtain_skipped() -> bool {
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD};
+    let key = to_wide(PERSONALIZATION_POLICY);
+    let value = to_wide("NoLockScreen");
+    let mut data = 0u32;
+    let mut size = std::mem::size_of::<u32>() as u32;
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            windows::core::PCWSTR(key.as_ptr()),
+            windows::core::PCWSTR(value.as_ptr()),
+            RRF_RT_REG_DWORD,
+            None,
+            Some(&mut data as *mut u32 as *mut _),
+            Some(&mut size),
+        )
+    };
+    status.is_ok() && data == 1
+}
+
+/// Sets or clears `NoLockScreen` through an elevated `reg.exe` (Windows asks
+/// for administrator approval). Returns the resulting state.
+#[tauri::command]
+pub async fn set_lock_curtain_skipped(skip: bool) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
+        use windows::Win32::System::Threading::WaitForSingleObject;
+        use windows::Win32::UI::Shell::{
+            ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
+
+        let key = format!(r"HKLM\{PERSONALIZATION_POLICY}");
+        let args = if skip {
+            format!(r#"add "{key}" /v NoLockScreen /t REG_DWORD /d 1 /f"#)
+        } else {
+            format!(r#"delete "{key}" /v NoLockScreen /f"#)
+        };
+        let verb = to_wide("runas");
+        let file = to_wide("reg.exe");
+        let params = to_wide(&args);
+        let mut info = SHELLEXECUTEINFOW {
+            cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+            fMask: SEE_MASK_NOCLOSEPROCESS,
+            lpVerb: windows::core::PCWSTR(verb.as_ptr()),
+            lpFile: windows::core::PCWSTR(file.as_ptr()),
+            lpParameters: windows::core::PCWSTR(params.as_ptr()),
+            nShow: SW_HIDE.0,
+            ..Default::default()
+        };
+        unsafe {
+            ShellExecuteExW(&mut info)
+                .map_err(|_| "Windows didn't get administrator approval".to_string())?;
+            if !info.hProcess.is_invalid() {
+                if WaitForSingleObject(info.hProcess, 15_000) != WAIT_OBJECT_0 {
+                    let _ = CloseHandle(info.hProcess);
+                    return Err("The registry change timed out".into());
+                }
+                let _ = CloseHandle(info.hProcess);
+            }
+        }
+        // Deleting a value that isn't there "fails" but leaves the wanted state.
+        Ok(lock_curtain_skipped())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn to_wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 #[derive(Serialize, Clone)]
