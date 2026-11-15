@@ -3184,6 +3184,7 @@ dependencies = [
  "base64 0.22.1",
  "image",
  "reqwest",
+ "ring",
  "rustfft",
  "rustls",
  "serde",

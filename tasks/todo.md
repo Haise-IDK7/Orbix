@@ -23,6 +23,14 @@
 - [x] Shelf: always reachable, Files/Clipboard tabs, paste, clipboard history (`clipboard.rs`)
 - [x] Page dots, mojibake fixes
 
+### Round 3: like, dock, lock screen, controls, audio toast
+- [x] Spotify like button (PKCE OAuth, DPAPI token, `/me/library`) (`spotify.rs`, `components/spotify/`)
+- [x] Start icon spins on hover; show-desktop bar (`SpinningIcon.tsx`, `show_desktop`)
+- [x] Lock screen: idle/lock trigger, fonts, auto palette, depth/glass/blend, widgets (`lockscreen.rs`, `components/lockscreen/`, Settings → Lock Screen)
+- [x] Minimal control center restyle
+- [x] Date in the expanded notch
+- [x] Audio toast: diff all active outputs, not just the default device
+
 ### Previous
 
 - [x] Task 1: Backend Non-Recursive Direct Folder Scanning (`src-tauri/src/wallpaper.rs`)

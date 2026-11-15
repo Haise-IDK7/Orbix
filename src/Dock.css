@@ -828,3 +828,23 @@ body {
 	background: #888;
 	box-shadow: none;
 }
+
+/* Show desktop: a slim bar at the end of the dock, like the taskbar corner */
+.show-desktop-bar {
+	align-self: stretch;
+	width: 6px;
+	margin: 4px -2px 4px 2px;
+	padding: 0;
+	border: none;
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--bloom-text, white) 14%, transparent);
+	cursor: pointer;
+	transition:
+		background 0.2s ease,
+		width 0.2s ease;
+}
+
+.show-desktop-bar:hover {
+	width: 8px;
+	background: color-mix(in srgb, var(--bloom-text, white) 38%, transparent);
+}

@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wifi, Bluetooth, Volume2, VolumeX, Sun, SlidersHorizontal, Headphones, Speaker } from "lucide-react";
+import {
+	Wifi,
+	Bluetooth,
+	Volume2,
+	VolumeX,
+	Sun,
+	SlidersHorizontal,
+	Headphones,
+	Speaker,
+	PanelBottom,
+	PanelTop
+} from "lucide-react";
 import { SplitPillCard } from "./SplitPillCard";
 import { QuickActionGrid } from "./QuickActionGrid";
 import { ControlsFooter } from "./ControlsFooter";
@@ -233,6 +244,9 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 								onClick={(e) => onToggleDockMode(e)}
 								title="Cycle Dock Mode: Fixed / Smart / Peek"
 							>
+								<div className="cc-simple-tile-icon">
+									<PanelBottom size={15} />
+								</div>
 								<div className="cc-simple-tile-text">
 									<span className="cc-tile-title">Dock</span>
 									<span className="cc-tile-status">{dockMode === "fixed" ? "Fixed" : dockMode === "smart" ? "Smart" : "Peek"}</span>
@@ -246,6 +260,9 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 								onClick={(e) => onToggleNotchMode(e)}
 								title="Cycle Notch Mode: Fixed / Smart / Peek"
 							>
+								<div className="cc-simple-tile-icon">
+									<PanelTop size={15} />
+								</div>
 								<div className="cc-simple-tile-text">
 									<span className="cc-tile-title">Notch</span>
 									<span className="cc-tile-status">{notchMode === "fixed" ? "Fixed" : notchMode === "smart" ? "Smart" : "Peek"}</span>
@@ -301,6 +318,7 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 								>
 									{isMuted || displayVolume === 0 ? <VolumeX size={15} /> : <Volume2 size={15} />}
 								</button>
+								<span className="cc-slider-label">Volume</span>
 								<div className="cc-slider-track-wrap">
 									<input
 										type="range"
@@ -346,6 +364,7 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 								<div className="cc-slider-icon-btn">
 									<Sun size={15} />
 								</div>
+								<span className="cc-slider-label">Brightness</span>
 								<div className="cc-slider-track-wrap">
 									<input
 										type="range"

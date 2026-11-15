@@ -4785,11 +4785,38 @@ pub fn trigger_screen_snip() {
 }
 
 #[tauri::command]
-pub fn lock_workstation() {
+pub fn lock_workstation(app: AppHandle) {
+    if crate::lockscreen::replaces_lock_button(&app) {
+        let _ = crate::lockscreen::show(&app, false);
+        return;
+    }
     use std::os::windows::process::CommandExt;
     use std::process::Command;
     let _ = Command::new("rundll32.exe")
         .args(["user32.dll,LockWorkStation"])
         .creation_flags(0x08000000)
         .spawn();
+}
+
+/// Shows the desktop (or brings the windows back), like the taskbar's corner
+/// button or Win+D. Uses the shell's own ToggleDesktop on an STA thread.
+#[tauri::command]
+pub async fn show_desktop() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(|| unsafe {
+        use windows::Win32::System::Com::{
+            CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
+            COINIT_APARTMENTTHREADED,
+        };
+        use windows::Win32::UI::Shell::{IShellDispatch4, Shell};
+        let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
+        let result = CoCreateInstance::<_, IShellDispatch4>(&Shell, None, CLSCTX_INPROC_SERVER)
+            .and_then(|shell| shell.ToggleDesktop())
+            .map_err(|e| e.to_string());
+        if initialized {
+            CoUninitialize();
+        }
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }

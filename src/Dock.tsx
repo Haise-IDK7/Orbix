@@ -8,6 +8,7 @@ import { useSettingsSync } from "./hooks/useSettingsSync";
 import { useGlassBackdrop } from "./hooks/useGlassBackdrop";
 import { GlassLayer } from "./components/glass/GlassLayer";
 import { useStoredSetting } from "./hooks/useStoredSetting";
+import { SpinningIcon } from "./components/SpinningIcon";
 import { reloadIfMirrorWasStale } from "./hooks/settingsMirror";
 
 import { mergeTrayApps, selectDockTrayApps, type AppInfo, type TrayApp } from "./dockApps";
@@ -164,6 +165,11 @@ const Dock = memo(function Dock() {
 	const maxPinned = parseInt(maxPinnedValue, 10) || 0;
 	// Bumped by the settings window after editing the pinned list.
 	const [pinnedRevision] = useStoredSetting("bloom-dock-pinned-revision", "0");
+	// Turn the start icon clockwise while hovered (made for round icons like a Sharingan).
+	const [startIconSpinValue] = useStoredSetting("bloom-start-icon-spin", "true");
+	const startIconSpin = startIconSpinValue !== "false";
+	const [showDesktopValue] = useStoredSetting("bloom-show-desktop-button", "true");
+	const showDesktopButton = showDesktopValue !== "false";
 	useGlassBackdrop(glassStyle);
 	const [startIcon, setStartIcon] = useState(
 		() => localStorage.getItem("bloom-start-icon") || "default"
@@ -1251,14 +1257,13 @@ const Dock = memo(function Dock() {
 												handleAppClick(startItem);
 											}}
 										>
-											<img
+											<SpinningIcon
 												src={resolveStartIcon(startIcon)}
-												alt="Start"
+												spinning={startIconSpin && hoveredApp === itemKey(startItem)}
 												className="bloom-icon-img"
 												style={
 													startIcon.startsWith("custom:") ? { borderRadius: "8px" } : undefined
 												}
-												draggable={false}
 											/>
 										</motion.div>
 									</motion.div>
@@ -1604,6 +1609,18 @@ const Dock = memo(function Dock() {
 										/>
 										{dockExtras.map((extra) => renderExtra(extra))}
 									</>
+								)}
+								{showDesktopButton && (
+									<button
+										type="button"
+										className="show-desktop-bar"
+										title="Show desktop"
+										aria-label="Show desktop"
+										onClick={(e) => {
+											e.stopPropagation();
+											invoke("show_desktop").catch(console.error);
+										}}
+									/>
 								)}
 							</motion.div>
 						)}

@@ -1,4 +1,4 @@
-﻿use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename = "WmiMonitorBrightness")]
@@ -112,6 +112,19 @@ pub struct AudioDeviceStatus {
     pub output_device: String,
     #[serde(default)]
     pub output_bluetooth: bool,
+    /// All active output endpoints.
+    #[serde(default)]
+    pub outputs: Vec<AudioOutput>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct AudioOutput {
+    /// Endpoint name, e.g. "Auriculares (AirBuds Pro)".
+    pub name: String,
+    /// Device name, e.g. "AirBuds Pro".
+    pub device: String,
+    pub worn: bool,
+    pub bluetooth: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

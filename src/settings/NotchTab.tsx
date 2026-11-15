@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { useStoredSetting } from "../hooks/useStoredSetting";
+import { SpotifySettings } from "./SpotifySettings";
 import { StatusWidgetConfig } from "../components/StatusWidgetConfig";
 import type { WidgetConfig } from "./types";
 
@@ -332,6 +333,11 @@ export function NotchTab({
 						</SettingRow>
 					</>
 				)}
+			</div>
+
+			<div className="setting-group-label">Spotify</div>
+			<div className="setting-group">
+				<SpotifySettings />
 			</div>
 
 			<div className="setting-group-label">Shelf</div>

@@ -15,10 +15,13 @@ import {
 	FolderOpen,
 	FolderPlus,
 	Plus,
-	X
+	X,
+	RotateCw,
+	PanelRight
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { PinnedAppsManager } from "./PinnedAppsManager";
+import { useStoredSetting } from "../hooks/useStoredSetting";
 import { KNOWN_FOLDER_OPTIONS, parseEnabledFolders, parseCustomFolders } from "../dockExtras";
 
 const START_ICON_PRESETS = [
@@ -100,6 +103,8 @@ export function DockTab({
 	startIcon,
 	handleStartIconChange
 }: DockTabProps) {
+	const [startIconSpin, setStartIconSpin] = useStoredSetting("bloom-start-icon-spin", "true");
+	const [showDesktopButton, setShowDesktopButton] = useStoredSetting("bloom-show-desktop-button", "true");
 	const handleStartIconUpload = (e: ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
 		if (!file) return;
@@ -422,6 +427,35 @@ export function DockTab({
 
 			{dockEnabled && (
 				<>
+					<div className="setting-group-label">Start Button & Desktop</div>
+					<div className="setting-group">
+						<SettingRow icon={RotateCw} label="Spin Start Icon" desc="Turn clockwise while the pointer is over it">
+							<label className="toggle-switch">
+								<input
+									type="checkbox"
+									checked={startIconSpin !== "false"}
+									onChange={() => setStartIconSpin(startIconSpin === "false" ? "true" : "false")}
+								/>
+								<span className="slider"></span>
+							</label>
+						</SettingRow>
+						<SettingRow
+							icon={PanelRight}
+							label="Show Desktop Button"
+							desc="Slim bar at the end of the dock that shows the desktop"
+							divider={false}
+						>
+							<label className="toggle-switch">
+								<input
+									type="checkbox"
+									checked={showDesktopButton !== "false"}
+									onChange={() => setShowDesktopButton(showDesktopButton === "false" ? "true" : "false")}
+								/>
+								<span className="slider"></span>
+							</label>
+						</SettingRow>
+					</div>
+
 					<div className="setting-group-label">Fixed Apps</div>
 					<div className="setting-group">
 						<PinnedAppsManager />

@@ -951,6 +951,10 @@ unsafe fn endpoint_string(
     text.filter(|s| !s.is_empty())
 }
 
+fn output_names(status: &crate::types::AudioDeviceStatus) -> Vec<String> {
+    status.outputs.iter().map(|o| o.name.clone()).collect()
+}
+
 /// Endpoint form factors (EndpointFormFactor) that are worn on the head.
 const FORM_FACTOR_HEADPHONES: u32 = 3;
 const FORM_FACTOR_HEADSET: u32 = 5;
@@ -1009,26 +1013,63 @@ pub fn query_audio_devices_status(
         mic_name: String::new(),
         output_device: String::new(),
         output_bluetooth: false,
+        outputs: Vec::new(),
     };
+
+    // Describes one render endpoint: (endpoint name, device name, worn, bluetooth).
+    let describe =
+        |device: &windows::Win32::Media::Audio::IMMDevice| -> Option<crate::types::AudioOutput> {
+            let store = unsafe { device.OpenPropertyStore(STGM(0)) }.ok()?;
+            let name =
+                unsafe { endpoint_string(&store, &PKEY_DEVICE_FRIENDLY_NAME) }.unwrap_or_default();
+            let enumerator_name = unsafe { endpoint_string(&store, &PKEY_DEVICE_ENUMERATOR_NAME) };
+            let form_factor = unsafe { store.GetValue(&PKEY_AUDIO_ENDPOINT_FORM_FACTOR) }
+                .ok()
+                .and_then(|mut prop| {
+                    let value = unsafe {
+                        windows::Win32::System::Com::StructuredStorage::PropVariantToUInt32(&prop)
+                    }
+                    .ok();
+                    let _ = unsafe {
+                        windows::Win32::System::Com::StructuredStorage::PropVariantClear(&mut prop)
+                    };
+                    value
+                });
+            let (worn, bluetooth) = classify_output(&name, form_factor, enumerator_name.as_deref());
+            let device_name =
+                unsafe { endpoint_string(&store, &PKEY_DEVICE_INTERFACE_FRIENDLY_NAME) }
+                    .unwrap_or_else(|| name.clone());
+            Some(crate::types::AudioOutput {
+                name,
+                device: device_name,
+                worn,
+                bluetooth,
+            })
+        };
 
     unsafe {
         // 1. Render endpoint (Speakers / Headphones)
         if let Ok(render_dev) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
-            if let Ok(store) = render_dev.OpenPropertyStore(STGM(0)) {
-                let name = endpoint_string(&store, &PKEY_DEVICE_FRIENDLY_NAME).unwrap_or_default();
-                let enumerator_name = endpoint_string(&store, &PKEY_DEVICE_ENUMERATOR_NAME);
-                let form_factor = store.GetValue(&PKEY_AUDIO_ENDPOINT_FORM_FACTOR).ok().and_then(|mut prop| {
-                    let value = windows::Win32::System::Com::StructuredStorage::PropVariantToUInt32(&prop).ok();
-                    let _ = windows::Win32::System::Com::StructuredStorage::PropVariantClear(&mut prop);
-                    value
-                });
-                let (worn, bluetooth) = classify_output(&name, form_factor, enumerator_name.as_deref());
-                status.headphone_connected = worn;
-                status.output_bluetooth = bluetooth;
-                status.output_device = endpoint_string(&store, &PKEY_DEVICE_INTERFACE_FRIENDLY_NAME)
-                    .unwrap_or_else(|| name.clone());
-                status.headphone_name = name;
+            if let Some(out) = describe(&render_dev) {
+                status.headphone_connected = out.worn;
+                status.output_bluetooth = out.bluetooth;
+                status.output_device = out.device;
+                status.headphone_name = out.name;
             }
+        }
+
+        // Every active output, so a device that connects without becoming the
+        // default (wired jack on the same codec, a second Bluetooth device)
+        // still shows up as a change.
+        if let Ok(collection) = enumerator
+            .EnumAudioEndpoints(eRender, windows::Win32::Media::Audio::DEVICE_STATE_ACTIVE)
+        {
+            for i in 0..collection.GetCount().unwrap_or(0) {
+                if let Some(out) = collection.Item(i).ok().as_ref().and_then(describe) {
+                    status.outputs.push(out);
+                }
+            }
+            status.outputs.sort_by(|a, b| a.name.cmp(&b.name));
         }
 
         // 2. Capture endpoint (Microphone)
@@ -1087,6 +1128,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
             let mut last_headphone_state: Option<bool> = None;
             let mut last_mic_state: Option<bool> = None;
             let mut last_headphone_name = String::new();
+            let mut last_outputs: Vec<String> = Vec::new();
 
             let mut manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
                 .and_then(|op| op.get())
@@ -1127,7 +1169,9 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                         if last_headphone_state != Some(audio_status.headphone_connected)
                             || last_mic_state != Some(audio_status.mic_connected)
                             || last_headphone_name != audio_status.headphone_name
+                            || last_outputs != output_names(&audio_status)
                         {
+                            last_outputs = output_names(&audio_status);
                             last_headphone_state = Some(audio_status.headphone_connected);
                             last_mic_state = Some(audio_status.mic_connected);
                             last_headphone_name = audio_status.headphone_name.clone();

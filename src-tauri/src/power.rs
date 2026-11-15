@@ -39,7 +39,11 @@ pub fn power_sleep() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn power_lock() -> Result<(), String> {
+pub fn power_lock(app: tauri::AppHandle) -> Result<(), String> {
+    // The Orbix lock screen shows first and locks Windows on the first touch.
+    if crate::lockscreen::replaces_lock_button(&app) {
+        return crate::lockscreen::show(&app, false);
+    }
     unsafe {
         let res = LockWorkStation();
         if res.as_bool() {

@@ -1008,3 +1008,200 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+/* =======================================================
+   Minimal style: borderless rounded cards, one row of round
+   quick actions, labeled thin sliders. Overrides the rules above.
+   ======================================================= */
+.cc-root-container {
+	padding: 6px 12px 10px;
+}
+
+.cc-top-cards-grid {
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.cc-split-card,
+.cc-simple-tile {
+	height: 48px;
+	border: none;
+	border-radius: 16px;
+	background: rgba(255, 255, 255, 0.07);
+}
+
+.cc-split-card:hover,
+.cc-simple-tile:hover {
+	background: rgba(255, 255, 255, 0.11);
+	border: none;
+}
+
+.cc-split-card.active,
+.cc-simple-tile.active {
+	background: rgba(255, 255, 255, 0.13);
+	border: none;
+}
+
+.cc-split-main-btn {
+	gap: 10px;
+	padding: 0 10px 0 12px;
+}
+
+.cc-split-icon-wrapper,
+.cc-simple-tile-icon {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: transparent;
+	color: rgba(255, 255, 255, 0.55);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.cc-split-card.active .cc-split-icon-wrapper,
+.cc-simple-tile.active .cc-simple-tile-icon {
+	background: rgba(255, 255, 255, 0.92);
+	color: #0b0b10;
+}
+
+.cc-split-title,
+.cc-tile-title {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.cc-split-status,
+.cc-tile-status {
+	font-size: 10.5px;
+	color: rgba(255, 255, 255, 0.5);
+}
+
+.cc-split-card.active .cc-split-status,
+.cc-simple-tile.active .cc-tile-status {
+	color: rgba(255, 255, 255, 0.75);
+}
+
+.cc-split-divider {
+	display: none;
+}
+
+.cc-split-arrow-btn {
+	width: 30px;
+	color: rgba(255, 255, 255, 0.4);
+	border-radius: 0 16px 16px 0;
+}
+
+.cc-simple-tile {
+	justify-content: flex-start;
+	gap: 10px;
+	padding: 0 12px;
+}
+
+/* Quick actions: one row of round buttons, names in tooltips */
+.cc-actions-grid {
+	display: flex;
+	justify-content: space-between;
+	gap: 6px;
+	margin: 0 2px 12px;
+}
+
+.cc-action-tile {
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.07);
+	color: rgba(255, 255, 255, 0.75);
+	flex-shrink: 0;
+}
+
+.cc-action-tile:hover {
+	background: rgba(255, 255, 255, 0.14);
+	border: none;
+	color: #fff;
+}
+
+.cc-action-tile.active {
+	background: rgba(255, 255, 255, 0.92);
+	border: none;
+	color: #0b0b10;
+}
+
+.cc-action-tile.active svg {
+	color: #0b0b10;
+	filter: none;
+}
+
+.cc-action-name,
+.cc-perf-tile-bar {
+	display: none;
+}
+
+.cc-perf-tile.high {
+	color: #f87171;
+}
+
+/* Sliders: icon, label, thin track, value */
+.cc-sliders-container {
+	gap: 10px;
+	padding: 0 4px;
+	margin-bottom: 10px;
+	background: none;
+	border: none;
+}
+
+.cc-slider-row {
+	gap: 10px;
+	height: 18px;
+}
+
+.cc-slider-icon-btn {
+	color: rgba(255, 255, 255, 0.55);
+}
+
+.cc-slider-label {
+	width: 64px;
+	flex-shrink: 0;
+	font-size: 11.5px;
+	color: rgba(255, 255, 255, 0.75);
+}
+
+.cc-slider-track-wrap {
+	height: 4px;
+	background: rgba(255, 255, 255, 0.14);
+}
+
+.cc-slider-pct {
+	font-size: 11px;
+	font-weight: 500;
+	color: rgba(255, 255, 255, 0.6);
+	min-width: 30px;
+}
+
+.cc-output-device {
+	padding: 0;
+	margin-bottom: -2px;
+}
+
+/* Footer: quiet, no frame */
+.cc-footer-tray {
+	padding: 0 2px;
+	background: none;
+	border: none;
+}
+
+.cc-footer-network-pill,
+.cc-footer-mic-btn {
+	border: none;
+	border-radius: 11px;
+	background: rgba(255, 255, 255, 0.07);
+}
+
+.cc-footer-icon-btn {
+	border: none;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.07);
+}

@@ -2414,3 +2414,14 @@ img {
 .bloom .cc-slider-pct {
 	font-variant-numeric: tabular-nums;
 }
+
+/* Day and month beside the clock in the open notch */
+.notch-date {
+	font-size: 11.5px;
+	font-weight: 500;
+	color: var(--bloom-text-muted, rgba(255, 255, 255, 0.6));
+	white-space: nowrap;
+	overflow: hidden;
+	margin-right: 8px;
+	text-transform: capitalize;
+}

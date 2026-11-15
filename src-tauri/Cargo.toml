@@ -39,6 +39,8 @@ windows = { version = "0.61", features = [
 	"Win32_Media_Audio_Endpoints",
 	"Win32_System_Threading",
 	"Win32_System_Memory",
+	"Win32_System_Power",
+	"Win32_System_Shutdown",
 	"Win32_System_DataExchange",
 	"Win32_System_ProcessStatus",
 	"Win32_System_Com_StructuredStorage",
@@ -56,6 +58,7 @@ windows = { version = "0.61", features = [
 	"Win32_System_LibraryLoader",
 	"Win32_System_IO",
 	"Win32_Security",
+	"Win32_Security_Cryptography",
 	"Win32_System_Registry",
 	"Win32_Devices_FunctionDiscovery",
 	"Devices_Radios",
@@ -80,6 +83,8 @@ rustfft = "6"
 # Already in the tree via tauri-plugin-updater (same TLS backend); used for lyrics.
 reqwest = { version = "0.13", default-features = false }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
+# Already in the tree via rustls; SHA-256 and secure random for Spotify PKCE.
+ring = "0.17"
 
 [features]
 default = ["custom-protocol"]

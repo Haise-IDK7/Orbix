@@ -1,0 +1,371 @@
+html,
+body,
+#root {
+	margin: 0;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	background: #000;
+	user-select: none;
+	cursor: none;
+}
+
+.ls-root {
+	position: fixed;
+	inset: 0;
+	overflow: hidden;
+	font-family: "Inter Variable", "Segoe UI Variable", "Segoe UI", sans-serif;
+	color: #fff;
+}
+
+.ls-bg,
+.ls-subject canvas {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	pointer-events: none;
+}
+
+.ls-bg {
+	transform: scale(1.04);
+	transition: transform 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ls-root.visible .ls-bg {
+	transform: scale(1);
+}
+
+/* Keeps the date and widgets legible on bright wallpapers. */
+.ls-shade {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background:
+		linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0%, transparent 32%),
+		linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0%, transparent 30%);
+}
+
+/* ---------- Clock ---------- */
+
+.ls-content {
+	position: absolute;
+	left: 0;
+	right: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	pointer-events: none;
+}
+
+.ls-content.pos-top {
+	top: 6vh;
+}
+
+/* No transform here: it would isolate the "blend" style from the wallpaper. */
+.ls-content.pos-center {
+	top: 0;
+	bottom: 0;
+	justify-content: center;
+	padding-bottom: 8vh;
+}
+
+.ls-date {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	font-size: clamp(16px, 1.6vw, 26px);
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	text-transform: capitalize;
+	text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25);
+}
+
+.ls-weather {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 500;
+	opacity: 0.85;
+}
+
+.ls-clock {
+	line-height: 0.95;
+	letter-spacing: -0.01em;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	margin-top: -0.02em;
+}
+
+.ls-clock.style-solid,
+.ls-clock.style-depth {
+	text-shadow: 0 2px 30px rgba(0, 0, 0, 0.18);
+}
+
+/* Frosted: the text shows a blurred, brightened copy of the wallpaper. */
+.ls-clock.style-glass {
+	color: transparent;
+	background-image:
+		linear-gradient(rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.32)), var(--ls-blur);
+	background-size: cover;
+	background-position: center;
+	background-attachment: fixed;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-stroke: 1px rgba(255, 255, 255, 0.55);
+	filter: drop-shadow(0 4px 24px rgba(0, 0, 0, 0.18));
+}
+
+/* Fused: the digits take the wallpaper's light and texture. */
+.ls-clock.style-blend {
+	mix-blend-mode: overlay;
+	opacity: 0.95;
+}
+
+/* The wallpaper's subject, cut out, drawn over the clock. */
+.ls-subject {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.5s ease;
+}
+
+.ls-subject.shown {
+	opacity: 1;
+}
+
+/* ---------- Widgets ---------- */
+
+.ls-widgets {
+	position: absolute;
+	left: 4vw;
+	bottom: 9vh;
+	display: flex;
+	align-items: flex-end;
+	gap: 14px;
+	pointer-events: none;
+}
+
+.ls-widget {
+	padding: 14px 16px;
+	border-radius: 22px;
+	background: rgba(255, 255, 255, 0.14);
+	backdrop-filter: blur(24px) saturate(1.4);
+	-webkit-backdrop-filter: blur(24px) saturate(1.4);
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.ls-widget-title {
+	display: block;
+	margin-bottom: 8px;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	opacity: 0.8;
+}
+
+.ls-cal-grid {
+	display: grid;
+	grid-template-columns: repeat(7, 22px);
+	gap: 3px;
+	font-size: 11px;
+	font-weight: 600;
+	text-align: center;
+	line-height: 22px;
+}
+
+.ls-cal-label {
+	opacity: 0.55;
+	text-transform: uppercase;
+}
+
+.ls-cal-grid .today {
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.92);
+	color: #111;
+}
+
+.ls-battery {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	min-width: 86px;
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.ls-battery-bar {
+	width: 100%;
+	height: 5px;
+	border-radius: 3px;
+	background: rgba(255, 255, 255, 0.2);
+	overflow: hidden;
+}
+
+.ls-battery-bar > div {
+	height: 100%;
+	border-radius: 3px;
+	background: currentColor;
+}
+
+.ls-tasks {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-width: 240px;
+	font-size: 13px;
+	font-weight: 500;
+}
+
+.ls-task {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.ls-task.done {
+	opacity: 0.6;
+	font-size: 12px;
+}
+
+.ls-task-dot {
+	flex-shrink: 0;
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	border: 1.5px solid currentColor;
+}
+
+/* ---------- Now playing ---------- */
+
+.ls-media {
+	position: absolute;
+	right: 4vw;
+	bottom: 9vh;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: min(340px, 30vw);
+	padding: 10px 16px 10px 10px;
+	border-radius: 22px;
+	background: rgba(20, 20, 24, 0.32);
+	backdrop-filter: blur(28px) saturate(1.5);
+	-webkit-backdrop-filter: blur(28px) saturate(1.5);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	pointer-events: none;
+}
+
+.ls-media img,
+.ls-media-art {
+	flex-shrink: 0;
+	width: 52px;
+	height: 52px;
+	border-radius: 14px;
+	object-fit: cover;
+}
+
+.ls-media-art {
+	display: grid;
+	place-items: center;
+	background: rgba(255, 255, 255, 0.12);
+}
+
+.ls-media-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1;
+}
+
+.ls-media-title,
+.ls-media-artist {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.ls-media-title {
+	font-size: 14px;
+	font-weight: 700;
+}
+
+.ls-media-artist {
+	font-size: 12px;
+	opacity: 0.7;
+}
+
+.ls-media-state {
+	display: flex;
+	align-items: flex-end;
+	gap: 2px;
+	height: 14px;
+}
+
+.ls-media-state i {
+	width: 3px;
+	height: 4px;
+	border-radius: 2px;
+	background: currentColor;
+	opacity: 0.8;
+}
+
+.ls-media-state.playing i {
+	animation: ls-eq 0.9s ease-in-out infinite;
+}
+
+.ls-media-state.playing i:nth-child(2) {
+	animation-delay: 0.2s;
+}
+
+.ls-media-state.playing i:nth-child(3) {
+	animation-delay: 0.4s;
+}
+
+@keyframes ls-eq {
+	0%,
+	100% {
+		height: 4px;
+	}
+	50% {
+		height: 14px;
+	}
+}
+
+.ls-hint {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 3.2vh;
+	text-align: center;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	color: rgba(255, 255, 255, 0.75);
+	animation: ls-hint 2.8s ease-in-out infinite;
+	pointer-events: none;
+}
+
+@keyframes ls-hint {
+	0%,
+	100% {
+		opacity: 0.45;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ls-hint,
+	.ls-media-state.playing i {
+		animation: none;
+	}
+}

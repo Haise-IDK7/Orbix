@@ -150,6 +150,29 @@ Example:
 | `bloom-announcement-dismissed` | announcement id      | `""`      | ID of the last dismissed in-app announcement (published via `website/public/announcements.json`).               |
 | `bloom-time-format-24h`        | `"true"` / `"false"` | `"false"` | Use 24-hour clock format in the notch. When `"false"`, displays 12-hour format with AM/PM.                      |
 
+### Lock Screen
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `bloom-lock-enabled` | `"true"` / `"false"` | `"true"` | Orbix lock screen. Any input hands over to the Windows lock (`LockWorkStation`). |
+| `bloom-lock-idle` | minutes string | `"5"` | Show after this long without input; `"0"` = never. Skipped while video or a full-screen app keeps the display on. |
+| `bloom-lock-on-lock` | `"true"` / `"false"` | `"true"` | Orbix's Lock buttons show this page first. |
+| `bloom-lock-wallpaper` | file path | `""` | Background image; empty = desktop wallpaper. |
+| `bloom-lock-font` | font id | `"oswald"` | Clock typeface (lock fonts + notch fonts). |
+| `bloom-lock-weight` / `bloom-lock-size` | integer string | `"600"` / `"100"` | Clock weight (variable fonts) and size in percent (60 to 150). |
+| `bloom-lock-style` | `"depth"` / `"glass"` / `"blend"` / `"solid"` | `"depth"` | How the clock meets the wallpaper. Depth draws the wallpaper's subject in front (on-device segmentation). |
+| `bloom-lock-color-mode` / `bloom-lock-color` | `"auto"` / `"white"` / `"custom"`, hex | `"auto"`, `"#ffffff"` | Clock color; auto derives it from the wallpaper. |
+| `bloom-lock-position` | `"top"` / `"center"` | `"top"` | Clock position. |
+| `bloom-lock-w-date`, `-weather`, `-calendar`, `-battery`, `-media`, `-tasks` | `"true"` / `"false"` | on (tasks off) | Lock screen widgets. |
+
+### Dock Extras & Spotify
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `bloom-start-icon-spin` | `"true"` / `"false"` | `"true"` | Start icon turns clockwise on hover. |
+| `bloom-show-desktop-button` | `"true"` / `"false"` | `"true"` | Slim show-desktop bar at the end of the dock. |
+| `bloom-spotify-client-id` | string | `""` | Client ID of the user's Spotify developer app (enables the like button). |
+
 ### Internal (Do Not Edit Manually)
 
 | Key                 | Type     | Description                                                                           |

@@ -41,7 +41,8 @@ export default defineConfig(async () => ({
 				main: "index.html",
 				overlay: "overlay.html",
 				settings: "settings.html",
-				dock: "dock.html"
+				dock: "dock.html",
+				lockscreen: "lockscreen.html"
 			}
 		}
 	}

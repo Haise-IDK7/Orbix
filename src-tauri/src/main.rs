@@ -4,12 +4,14 @@ mod clipboard;
 mod commands;
 mod dock_extras;
 mod glass;
+mod lockscreen;
 mod lyrics;
 mod memory;
 mod package_icon;
 mod power;
 mod services;
 mod shelf;
+mod spotify;
 mod state;
 mod tray;
 mod types;
@@ -235,11 +237,21 @@ fn main() {
             clipboard::clipboard_remove,
             clipboard::clipboard_clear,
             clipboard::set_clipboard_history_enabled,
-            clipboard::clipboard_to_shelf
+            clipboard::clipboard_to_shelf,
+            show_desktop,
+            spotify::spotify_connect,
+            spotify::spotify_status,
+            spotify::spotify_disconnect,
+            spotify::spotify_track_state,
+            spotify::spotify_set_liked,
+            lockscreen::show_lock_screen,
+            lockscreen::dismiss_lock_screen,
+            lockscreen::get_lock_wallpaper
         ])
         .setup(|app| {
             init_taskbar_marker(app.handle());
             clipboard::start_monitor(app.handle().clone());
+            lockscreen::start_idle_watch(app.handle().clone());
             // Populate the settings cache before anything else: a webview can
             // invoke save_setting as soon as it loads, which happens before the
             // rest of this hook runs.
@@ -489,5 +501,3 @@ fn main() {
         }
     });
 }
-
-

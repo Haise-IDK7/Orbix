@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { MicVocal } from "lucide-react";
+import { LikeButton } from "./components/spotify/LikeButton";
 import { Visualizer } from "./App";
 import {
 	PlayIcon,
@@ -46,6 +47,8 @@ interface CompactMediaPlayerProps {
 	onLayoutChange: (layout: "classic" | "compact") => void;
 	lyricsOpen: boolean;
 	onToggleLyrics: () => void;
+	/** Present only when the song can be liked on Spotify. */
+	like?: { liked: boolean; toggle: () => void };
 }
 
 const MARQUEE_SPEED = 30;
@@ -130,7 +133,8 @@ export function CompactMediaPlayer({
 	onAnimateNext,
 	onLayoutChange,
 	lyricsOpen,
-	onToggleLyrics
+	onToggleLyrics,
+	like
 }: CompactMediaPlayerProps) {
 	const seekRef = useRef<HTMLInputElement>(null);
 
@@ -236,6 +240,7 @@ export function CompactMediaPlayer({
 				<div className="cmp-visualizer">
 					<Visualizer isPlaying={isPlaying} bars={5} height={16} />
 				</div>
+				{like && <LikeButton liked={like.liked} onToggle={like.toggle} />}
 				<button
 					type="button"
 					className={`lyrics-toggle-btn ${lyricsOpen ? "active" : ""}`}

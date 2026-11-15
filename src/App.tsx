@@ -32,6 +32,8 @@ import { usePomodoroRunning } from "./components/focus/pomodoroStore";
 import { AudioDeviceCard, AUDIO_CARD_HEIGHT, type AudioToast } from "./components/audio/AudioDeviceCard";
 import { ClipboardList, type ShelfPaste } from "./components/shelf/ClipboardList";
 import { PanelDots } from "./components/PanelDots";
+import { LikeButton } from "./components/spotify/LikeButton";
+import { useSpotifyLike } from "./components/spotify/useSpotifyLike";
 import { PowerView } from "./components/power/PowerView";
 import { WallpaperView } from "./components/wallpaper/WallpaperView";
 import { AppsView } from "./components/apps/AppsView";
@@ -506,6 +508,7 @@ function App() {
 		mic_name: string;
 		output_device?: string;
 		output_bluetooth?: boolean;
+		outputs?: { name: string; device: string; worn: boolean; bluetooth: boolean }[];
 	}>({
 		headphone_connected: false,
 		headphone_name: "",
@@ -520,12 +523,14 @@ function App() {
 
 	const triggerAudioToast = useCallback((toast: AudioToast) => {
 		if (audioToastTimerRef.current) clearTimeout(audioToastTimerRef.current);
+		// Show the notch even when it's tucked away (peek / smart modes).
+		triggerEventPeek(3800);
 		setAudioToast(toast);
 		audioToastTimerRef.current = window.setTimeout(() => {
 			setAudioToast(null);
 			audioToastTimerRef.current = null;
 		}, 3500);
-	}, []);
+	}, [triggerEventPeek]);
 
 	// Notch Control Center feature selections
 	const [notchControlSavings, setNotchControlSavings] = useState(
@@ -584,9 +589,34 @@ function App() {
 			audioDevicesRef.current = next;
 			setAudioDevices(next);
 
-			if (notchAudioIndicator) {
-				const outputChanged = !!prev.headphone_name && prev.headphone_name !== next.headphone_name;
-				if (prev.headphone_connected && !next.headphone_connected) {
+			// Before the first status arrives there is nothing to compare against.
+			const known = !!prev.headphone_name || (prev.outputs?.length ?? 0) > 0;
+			if (notchAudioIndicator && known) {
+				const outputChanged = prev.headphone_name !== next.headphone_name;
+				// New or vanished outputs catch devices that don't become (or
+				// weren't) the default, e.g. a wired jack on the same codec.
+				const prevOutputs = prev.outputs ?? [];
+				const nextOutputs = next.outputs ?? [];
+				const added = nextOutputs.filter((o) => !prevOutputs.some((p) => p.name === o.name));
+				const removed = prevOutputs.filter((o) => !nextOutputs.some((n) => n.name === o.name));
+				const pick = (list: typeof nextOutputs) => list.find((o) => o.worn || o.bluetooth) ?? list[0];
+				if (added.length > 0) {
+					const out = pick(added);
+					triggerAudioToast({
+						kind: out.worn ? "headphones" : "speaker",
+						title: out.device || out.name,
+						connected: true,
+						bluetooth: out.bluetooth
+					});
+				} else if (removed.length > 0) {
+					const out = pick(removed);
+					triggerAudioToast({
+						kind: out.worn ? "headphones" : "speaker",
+						title: out.device || out.name,
+						connected: false,
+						bluetooth: out.bluetooth
+					});
+				} else if (prev.headphone_connected && !next.headphone_connected) {
 					triggerAudioToast({
 						kind: "headphones",
 						title: prev.output_device || prev.headphone_name || "Headphones",
@@ -890,6 +920,7 @@ function App() {
 		updatedAt: mediaInfo.position_updated_at ?? 0,
 		isPlaying
 	});
+	const spotifyLike = useSpotifyLike(mediaInfo.title, mediaInfo.has_media);
 	const activeLyricText = activeLyricIndex >= 0 ? lyrics.lines[activeLyricIndex]?.text || "♪" : null;
 
 	// Weather hook
@@ -2631,7 +2662,7 @@ function App() {
 		// Shelf expands on mode alone (no hover needed — there is no cursor
 		// hover during an OS drag) and is sized to exactly one row of tiles.
 		if (bloomMode === "shelf") return showClipboardTab || shelfItems.length > 0 ? 210 : 170;
-		if (bloomMode === "command-center") return isHovered ? (ccSubView === "wifi" || ccSubView === "performance" ? 400 : ccSubView === "bluetooth" ? 360 : 346) : 36;
+		if (bloomMode === "command-center") return isHovered ? (ccSubView === "wifi" || ccSubView === "performance" ? 400 : ccSubView === "bluetooth" ? 360 : 320) : 36;
 		if (bloomMode === "apps") return isHovered ? 400 : 36;
 		if (bloomMode === "power") return isHovered ? 124 : 36;
 		if (bloomMode === "pomodoro") return isHovered ? 222 : 36;
@@ -2654,6 +2685,11 @@ function App() {
 	};
 
 	const isCalendarMode = bloomMode === "calendar";
+	// Short weekday/day/month in the user's locale ("dom 15 nov"), beside the
+	// clock while the notch is open. Re-evaluated with each clock tick.
+	const notchDate = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" })
+		.format(new Date())
+		.replace(/[,.]/g, "");
 	// Dots for the roomier panels; dense ones (controls, apps, wallpaper) use
 	// their bottom edge for content.
 	const cyclableModes = getCyclableModes();
@@ -2951,6 +2987,20 @@ function App() {
 																		</motion.button>
 																	)}
 																</AnimatePresence>
+																<AnimatePresence>
+																	{isHovered && (
+																		<motion.span
+																			key="notch-date"
+																			className="notch-date"
+																			initial={{ opacity: 0, width: 0 }}
+																			animate={{ opacity: 1, width: "auto" }}
+																			exit={{ opacity: 0, width: 0 }}
+																			transition={{ duration: 0.18 }}
+																		>
+																			{notchDate}
+																		</motion.span>
+																	)}
+																</AnimatePresence>
 																<div className="time-flip-container" onClick={toggleCalendarMode}>
 																	<AnimatePresence initial={false}>
 																		{pomodoroRunning && timerSeconds === 0 && !isTimerFinished ? (
@@ -3073,6 +3123,7 @@ function App() {
 											>
 											{mediaLayout === "compact" ? (
 												<CompactMediaPlayer
+													like={spotifyLike.available ? spotifyLike : undefined}
 													lyricsOpen={lyricsOpen}
 													onToggleLyrics={toggleLyrics}
 													mediaInfo={mediaInfo}
@@ -3175,6 +3226,9 @@ function App() {
 																		<Visualizer isPlaying={isPlaying} bars={5} height={18} />
 																	)}
 																</div>
+																{spotifyLike.available && (
+																	<LikeButton liked={spotifyLike.liked} onToggle={spotifyLike.toggle} />
+																)}
 																<button
 																	type="button"
 																	className={`lyrics-toggle-btn ${lyricsOpen ? "active" : ""}`}
