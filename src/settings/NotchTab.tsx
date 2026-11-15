@@ -23,11 +23,11 @@ import {
 	Radio,
 	Network,
 	Headphones,
-	Languages,
-	Mail
+	Languages
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { useStoredSetting } from "../hooks/useStoredSetting";
+import { TranslationSettings } from "./TranslationSettings";
 import { SpotifySettings } from "./SpotifySettings";
 import { StatusWidgetConfig } from "../components/StatusWidgetConfig";
 import type { WidgetConfig } from "./types";
@@ -146,7 +146,6 @@ export function NotchTab({
 }: NotchTabProps) {
 	const [lyricsLayout, setLyricsLayout] = useStoredSetting("bloom-lyrics-layout", "vertical");
 	const [translateTo, setTranslateTo] = useStoredSetting("bloom-lyrics-translate-to", "es");
-	const [translateEmail, setTranslateEmail] = useStoredSetting("bloom-translate-email", "");
 	const [pomodoroEnabled, setPomodoroEnabled] = useStoredSetting("bloom-pomodoro-enabled", "true");
 	const [tasksEnabled, setTasksEnabled] = useStoredSetting("bloom-tasks-enabled", "true");
 	const [clipboardHistory, setClipboardHistory] = useStoredSetting("bloom-clipboard-history", "true");
@@ -328,21 +327,7 @@ export function NotchTab({
 							</select>
 						</SettingRow>
 
-						<SettingRow
-							icon={Mail}
-							label="Translation Email (optional)"
-							desc="Free translations allow ~5,000 characters a day (2–3 songs); an email raises it to 50,000. It's sent only to MyMemory."
-						>
-							<input
-								className="spotify-input"
-								type="email"
-								placeholder="you@example.com"
-								value={translateEmail}
-								onChange={(e) => setTranslateEmail(e.target.value.trim())}
-								spellCheck={false}
-								style={{ maxWidth: 190 }}
-							/>
-						</SettingRow>
+						<TranslationSettings />
 
 						<SettingRow
 							icon={Sparkles}

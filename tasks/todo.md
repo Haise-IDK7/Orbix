@@ -44,6 +44,11 @@
 - [x] Sleep: call SetSuspendState directly (rundll32 form hibernated); Modern Standby fallback
 - [x] Memory: WebView2 low memory target for hidden Settings/Lock screen, depth model in a throwaway worker, lock screen media only while shown, clipboard image cap 24 MB, lyrics cache cap, "Orbix is using X MB" in Performance
 
+### Round 6: README and translation engines
+- [x] Translation: on-device WebView2/Edge Translator first (no limit), Microsoft Translator with user key (2M chars/month, DPAPI), MyMemory fallback
+- [x] Settings → Notch: translation engines panel
+- [x] README: What's New section, new screenshots, network use table, fork download
+
 ### Previous
 
 - [x] Task 1: Backend Non-Recursive Direct Folder Scanning (`src-tauri/src/wallpaper.rs`)

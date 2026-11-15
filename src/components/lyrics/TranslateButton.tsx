@@ -11,6 +11,12 @@ const LANGUAGE_NAMES: Record<string, string> = {
 	it: "Italian"
 };
 
+const ENGINE_NAMES: Record<string, string> = {
+	device: "translated on this PC",
+	microsoft: "Microsoft Translator",
+	mymemory: "MyMemory"
+};
+
 /** Translate toggle beside the lyrics button; its tooltip carries the status. */
 export const TranslateButton: React.FC<{
 	on: boolean;
@@ -25,7 +31,7 @@ export const TranslateButton: React.FC<{
 			: state.status === "same"
 				? `Already in ${name}`
 				: on
-					? "Hide translation"
+					? `Hide translation${state.status === "ready" ? ` (${ENGINE_NAMES[state.engine]})` : ""}`
 					: `Translate to ${name}`;
 	return (
 		<button

@@ -1531,3 +1531,41 @@ input:checked + .slider:before {
 .settings-slider:disabled {
 	opacity: 0.35;
 }
+
+/* ── Lyrics translation engines (Notch tab) ───────────────────────────── */
+.translation-engine {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+}
+
+.translation-engine > .spotify-badge {
+	margin-left: 0;
+	margin-top: 1px;
+	flex-shrink: 0;
+	min-width: 58px;
+	text-align: center;
+}
+
+.translation-engine > div {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+	flex: 1;
+}
+
+.translation-engine p {
+	margin: 0;
+	font-size: 11.5px;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.translation-engine a {
+	color: var(--bloom-accent, #0a84ff);
+}
+
+.translation-region {
+	max-width: 90px;
+}

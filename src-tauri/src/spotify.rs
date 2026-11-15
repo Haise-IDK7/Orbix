@@ -72,7 +72,7 @@ fn random_state() -> Result<String, String> {
 
 // ── Encrypted token storage (DPAPI) ─────────────────────────────────────────
 
-fn dpapi(data: &[u8], protect: bool) -> Option<Vec<u8>> {
+pub(crate) fn dpapi(data: &[u8], protect: bool) -> Option<Vec<u8>> {
     use windows::Win32::Foundation::{LocalFree, HLOCAL};
     use windows::Win32::Security::Cryptography::{
         CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,

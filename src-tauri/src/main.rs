@@ -256,6 +256,9 @@ fn main() {
             bluetooth::bluetooth_devices,
             services::get_media_snapshot,
             translate::translate_lyrics,
+            translate::translator_key_status,
+            translate::set_translator_key,
+            translate::clear_translator_key,
             bluetooth::bluetooth_set_connected,
             bluetooth::bluetooth_add_device
         ])

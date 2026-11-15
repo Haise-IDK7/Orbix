@@ -174,6 +174,8 @@ Example:
 | `bloom-lyrics-translate-to` | language code | `"es"` | Target language: es, en, pt, fr, de, it. |
 | `bloom-translate-email` | email | `""` | Optional; sent to MyMemory to raise the free limit from ~5,000 to 50,000 characters a day. |
 
+Engines are tried in order: the on-device translator (WebView2/Edge 148+), Microsoft Translator if a key is saved (stored DPAPI-encrypted in `translator_key.bin`, not in this file), then MyMemory.
+
 ### Dock Extras & Spotify
 
 | Key | Type | Default | Description |
