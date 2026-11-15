@@ -143,6 +143,11 @@ export const PerformanceSubView: React.FC<PerformanceSubViewProps> = ({ onBack }
 						{optimizing ? "Freeing memory…" : "Free up RAM"}
 					</button>
 					{message && <span className="cc-perf-message">{message}</span>}
+					{report?.orbix_mb ? (
+						<span className="cc-perf-own" title="Orbix plus the WebView2 processes that draw the notch, dock and other windows">
+							Orbix is using {formatMb(report.orbix_mb)}
+						</span>
+					) : null}
 				</div>
 
 				<span className="cc-perf-section-title">Using the most memory</span>

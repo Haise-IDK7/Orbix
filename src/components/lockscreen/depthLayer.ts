@@ -1,23 +1,24 @@
 // Subject cut-out for the lock screen's depth effect (subject in front of the
 // clock). Uses U²-Net-P (Apache-2.0, ~4.5 MB), a small salient-object model,
-// run once per wallpaper with ONNX Runtime Web in a worker thread.
-import * as ort from "onnxruntime-web/wasm";
-import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.wasm?url";
-
-ort.env.wasm.wasmPaths = { wasm: wasmUrl };
-ort.env.wasm.numThreads = 1;
-// Inference happens in a worker so the UI never stalls.
-ort.env.wasm.proxy = true;
+// run once per wallpaper with ONNX Runtime Web in a short-lived worker (no UI
+// stalls, and its memory is returned as soon as the mask is ready).
 
 const SIZE = 320;
 const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
 
-let session: Promise<ort.InferenceSession> | null = null;
-const getSession = () =>
-	(session ??= ort.InferenceSession.create("/models/u2netp.onnx", {
-		executionProviders: ["wasm"]
-	}));
+/** Runs the model in a fresh worker and terminates it when done. */
+function runModel(input: Float32Array): Promise<Float32Array> {
+	const worker = new Worker(new URL("./depthWorker.ts", import.meta.url), { type: "module" });
+	return new Promise<Float32Array>((resolve, reject) => {
+		worker.onmessage = (e: MessageEvent<{ out?: Float32Array; error?: string }>) =>
+			e.data.out ? resolve(e.data.out) : reject(new Error(e.data.error ?? "Depth model failed"));
+		worker.onerror = (e) => reject(new Error(e.message));
+		worker.postMessage({ input, modelUrl: new URL("/models/u2netp.onnx", location.href).href }, [
+			input.buffer
+		]);
+	}).finally(() => worker.terminate());
+}
 
 type Source = HTMLImageElement | HTMLCanvasElement;
 const sizeOf = (img: Source) =>
@@ -36,11 +37,7 @@ async function subjectMask(img: Source): Promise<Float32Array> {
 			input[c * SIZE * SIZE + i] = (data[i * 4 + c] / 255 - MEAN[c]) / STD[c];
 		}
 	}
-	const s = await getSession();
-	const result = await s.run({
-		[s.inputNames[0]]: new ort.Tensor("float32", input, [1, 3, SIZE, SIZE])
-	});
-	const out = result[s.outputNames[0]].data as Float32Array;
+	const out = await runModel(input);
 	let min = Infinity;
 	let max = -Infinity;
 	for (const v of out) {

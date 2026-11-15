@@ -122,13 +122,18 @@ export const LockScreen: React.FC = () => {
 	const shownAt = useRef(0);
 	const now = useNow();
 
-	// Media keeps flowing to this (hidden) window, so the card is current.
+	// Follow media only while shown: hidden, this window would otherwise
+	// receive every update (album art included) for nothing.
 	useEffect(() => {
+		if (!visible) return;
+		invoke<MediaInfo | null>("get_media_snapshot")
+			.then((m) => m && setMedia(m))
+			.catch(() => {});
 		const unlisten = listen<MediaInfo>("media-update", (e) => setMedia(e.payload));
 		return () => {
 			unlisten.then((f) => f());
 		};
-	}, []);
+	}, [visible]);
 
 	const loadWallpaper = useCallback(() => {
 		invoke<LockWallpaper | null>("get_lock_wallpaper", { path: wallpaperPath || null })

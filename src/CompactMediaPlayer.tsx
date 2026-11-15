@@ -48,6 +48,8 @@ interface CompactMediaPlayerProps {
 	onLayoutChange: (layout: "classic" | "compact") => void;
 	lyricsOpen: boolean;
 	onToggleLyrics: () => void;
+	/** Lyrics translation toggle, shown while lyrics are open. */
+	translateButton?: React.ReactNode;
 	/** Present only when the song can be liked on Spotify. */
 	like?: { liked: boolean; toggle: () => void; status: LikeStatus; hint: string };
 }
@@ -134,6 +136,7 @@ export function CompactMediaPlayer({
 	onAnimateNext,
 	onLayoutChange,
 	lyricsOpen,
+	translateButton,
 	onToggleLyrics,
 	like
 }: CompactMediaPlayerProps) {
@@ -242,6 +245,7 @@ export function CompactMediaPlayer({
 					<Visualizer isPlaying={isPlaying} bars={5} height={16} />
 				</div>
 				{like && <LikeButton liked={like.liked} onToggle={like.toggle} status={like.status} hint={like.hint} />}
+				{translateButton}
 				<button
 					type="button"
 					className={`lyrics-toggle-btn ${lyricsOpen ? "active" : ""}`}

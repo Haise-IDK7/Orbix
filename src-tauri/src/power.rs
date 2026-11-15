@@ -28,13 +28,60 @@ pub fn power_restart() -> Result<(), String> {
     Ok(())
 }
 
+/// Lets this process use SetSuspendState (standard users hold the privilege,
+/// but it starts disabled).
+fn enable_shutdown_privilege() {
+    use windows::Win32::Foundation::{CloseHandle, HANDLE, LUID};
+    use windows::Win32::Security::{
+        AdjustTokenPrivileges, LookupPrivilegeValueW, LUID_AND_ATTRIBUTES, SE_PRIVILEGE_ENABLED,
+        SE_SHUTDOWN_NAME, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY,
+    };
+    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+    unsafe {
+        let mut token = HANDLE::default();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &mut token).is_err() {
+            return;
+        }
+        let mut luid = LUID::default();
+        if LookupPrivilegeValueW(None, SE_SHUTDOWN_NAME, &mut luid).is_ok() {
+            let privileges = TOKEN_PRIVILEGES {
+                PrivilegeCount: 1,
+                Privileges: [LUID_AND_ATTRIBUTES {
+                    Luid: luid,
+                    Attributes: SE_PRIVILEGE_ENABLED,
+                }],
+            };
+            let _ = AdjustTokenPrivileges(token, false, Some(&privileges), 0, None, None);
+        }
+        let _ = CloseHandle(token);
+    }
+}
+
+/// Sleep (suspend to RAM). Calls SetSuspendState directly: the old
+/// `rundll32 powrprof.dll,SetSuspendState 0,1,0` passes rundll32's own
+/// arguments instead of 0,1,0, so on PCs with hibernation enabled it
+/// hibernated. On Modern Standby PCs, which don't support that call, turning
+/// the display off is how Windows enters standby.
 #[tauri::command]
 pub fn power_sleep() -> Result<(), String> {
-    Command::new("rundll32.exe")
-        .args(["powrprof.dll,SetSuspendState", "0,1,0"])
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn()
-        .map_err(|e| format!("Failed to initiate sleep: {e}"))?;
+    // SetSuspendState only returns after the PC wakes up; keep it off the
+    // main thread.
+    std::thread::spawn(|| unsafe {
+        enable_shutdown_privilege();
+        if !windows::Win32::System::Power::SetSuspendState(false, false, false) {
+            use windows::Win32::Foundation::{LPARAM, WPARAM};
+            use windows::Win32::UI::WindowsAndMessaging::{
+                PostMessageW, HWND_BROADCAST, SC_MONITORPOWER, WM_SYSCOMMAND,
+            };
+            const MONITOR_OFF: isize = 2;
+            let _ = PostMessageW(
+                Some(HWND_BROADCAST),
+                WM_SYSCOMMAND,
+                WPARAM(SC_MONITORPOWER as usize),
+                LPARAM(MONITOR_OFF),
+            );
+        }
+    });
     Ok(())
 }
 

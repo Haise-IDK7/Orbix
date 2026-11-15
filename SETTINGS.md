@@ -166,6 +166,14 @@ Example:
 | `bloom-lock-position` | `"top"` / `"center"` | `"top"` | Clock position. |
 | `bloom-lock-w-date`, `-weather`, `-calendar`, `-battery`, `-media`, `-tasks` | `"true"` / `"false"` | on (tasks off) | Lock screen widgets. |
 
+### Lyrics Translation
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| `bloom-lyrics-translate` | `"true"` / `"false"` | `"false"` | Show a translation under each lyric line (toggle beside the lyrics button). |
+| `bloom-lyrics-translate-to` | language code | `"es"` | Target language: es, en, pt, fr, de, it. |
+| `bloom-translate-email` | email | `""` | Optional; sent to MyMemory to raise the free limit from ~5,000 to 50,000 characters a day. |
+
 ### Dock Extras & Spotify
 
 | Key | Type | Default | Description |

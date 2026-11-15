@@ -23,6 +23,8 @@ pub struct BtDevice {
     pub connected: bool,
     /// Orbix can connect/disconnect it (Bluetooth audio).
     pub can_toggle: bool,
+    /// Battery percentage, when the device reports one (connected only).
+    pub battery: Option<u8>,
 }
 
 #[derive(Serialize)]
@@ -79,6 +81,7 @@ fn classic_devices() -> Vec<BtDevice> {
                 kind: kind.to_string(),
                 connected: info.fConnected.as_bool(),
                 can_toggle: kind == "audio",
+                battery: None,
             });
         }
         info = blank();
@@ -123,9 +126,101 @@ fn le_devices() -> Vec<BtDevice> {
             kind: "other".into(),
             connected,
             can_toggle: false,
+            battery: None,
         });
     }
     out
+}
+
+/// Battery level Windows keeps for a Bluetooth device (the value shown in
+/// Settings → Bluetooth & devices). Headsets report it over Hands-Free, LE
+/// devices through the Battery Service.
+const BATTERY_KEY: windows::Win32::Foundation::DEVPROPKEY =
+    windows::Win32::Foundation::DEVPROPKEY {
+        fmtid: windows::core::GUID::from_u128(0x104ea319_6ee2_4701_bd47_8ddbf425bbe5),
+        pid: 2,
+    };
+
+/// (device-node name, battery %) for every present device that reports one.
+fn battery_levels() -> Vec<(String, u8)> {
+    use windows::Win32::Devices::DeviceAndDriverInstallation::{
+        SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInfo, SetupDiGetClassDevsW,
+        SetupDiGetDevicePropertyW, DIGCF_ALLCLASSES, DIGCF_PRESENT, SP_DEVINFO_DATA,
+    };
+    use windows::Win32::Devices::Properties::{
+        DEVPKEY_Device_FriendlyName, DEVPROPTYPE, DEVPROP_TYPE_BYTE, DEVPROP_TYPE_STRING,
+    };
+    let mut out = Vec::new();
+    unsafe {
+        let Ok(set) = SetupDiGetClassDevsW(
+            None,
+            windows::core::PCWSTR::null(),
+            None,
+            DIGCF_ALLCLASSES | DIGCF_PRESENT,
+        ) else {
+            return out;
+        };
+        let mut index = 0u32;
+        loop {
+            let mut data = SP_DEVINFO_DATA {
+                cbSize: std::mem::size_of::<SP_DEVINFO_DATA>() as u32,
+                ..Default::default()
+            };
+            if SetupDiEnumDeviceInfo(set, index, &mut data).is_err() {
+                break;
+            }
+            index += 1;
+            let mut kind = DEVPROPTYPE(0);
+            let mut level = [0u8; 1];
+            if SetupDiGetDevicePropertyW(
+                set,
+                &data,
+                &BATTERY_KEY,
+                &mut kind,
+                Some(&mut level),
+                None,
+                0,
+            )
+            .is_err()
+                || kind != DEVPROP_TYPE_BYTE
+            {
+                continue;
+            }
+            let mut name = [0u16; 256];
+            let name_bytes = std::slice::from_raw_parts_mut(
+                name.as_mut_ptr() as *mut u8,
+                std::mem::size_of_val(&name),
+            );
+            if SetupDiGetDevicePropertyW(
+                set,
+                &data,
+                &DEVPKEY_Device_FriendlyName,
+                &mut kind,
+                Some(name_bytes),
+                None,
+                0,
+            )
+            .is_ok()
+                && kind == DEVPROP_TYPE_STRING
+            {
+                let name = wide_to_string(&name);
+                if !name.is_empty() {
+                    out.push((name, level[0].min(100)));
+                }
+            }
+        }
+        let _ = SetupDiDestroyDeviceInfoList(set);
+    }
+    out
+}
+
+/// Battery for a device, from the device node named after it ("WH-1000XM4",
+/// "WH-1000XM4 Hands-Free AG").
+fn battery_for(name: &str, levels: &[(String, u8)]) -> Option<u8> {
+    levels
+        .iter()
+        .find(|(node, _)| names_match(name, std::slice::from_ref(node)))
+        .map(|(_, level)| *level)
 }
 
 /// Classic first (it knows the device type), then LE devices not already
@@ -160,11 +255,17 @@ pub fn overview() -> BtOverview {
     let enabled =
         crate::commands::get_radio_state_sync(windows::Devices::Radios::RadioKind::Bluetooth)
             .unwrap_or(false);
-    let devices = if enabled {
+    let mut devices = if enabled {
         merge(classic_devices(), le_devices())
     } else {
         Vec::new()
     };
+    if devices.iter().any(|d| d.connected) {
+        let levels = battery_levels();
+        for dev in devices.iter_mut().filter(|d| d.connected) {
+            dev.battery = battery_for(&dev.name, &levels);
+        }
+    }
     BtOverview { enabled, devices }
 }
 
@@ -368,6 +469,17 @@ mod tests {
     }
 
     #[test]
+    fn finds_battery_by_device_node_name() {
+        let levels = vec![
+            ("Galaxy Buds2 Hands-Free AG".to_string(), 70),
+            ("MX Master 3S".to_string(), 95),
+        ];
+        assert_eq!(battery_for("Galaxy Buds2", &levels), Some(70));
+        assert_eq!(battery_for("mx master 3s", &levels), Some(95));
+        assert_eq!(battery_for("JBL Flip 5", &levels), None);
+    }
+
+    #[test]
     fn merges_and_sorts_connected_first() {
         let dev = |name: &str, connected: bool| BtDevice {
             id: name.into(),
@@ -375,6 +487,7 @@ mod tests {
             kind: "other".into(),
             connected,
             can_toggle: false,
+            battery: None,
         };
         let merged = merge(
             vec![dev("Buds", false), dev("Alpha", false)],

@@ -152,7 +152,13 @@ export const ControlsView: React.FC<ControlsViewProps> = React.memo(({
 			.catch(() => {});
 
 		invoke<BtOverview>("bluetooth_devices")
-			.then((o) => setBtConnected(o.devices.filter((d) => d.connected).map((d) => d.name)))
+			.then((o) =>
+				setBtConnected(
+					o.devices
+						.filter((d) => d.connected)
+						.map((d) => (typeof d.battery === "number" ? `${d.battery}% · ${d.name}` : d.name))
+				)
+			)
 			.catch(() => {});
 
 		try {

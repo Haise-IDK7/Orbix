@@ -20,6 +20,8 @@ interface LyricsPanelProps {
 	activeIndex: number;
 	canSeek: boolean;
 	onSeek: (positionMs: number) => void;
+	/** Translation per line (same indexes as the lyrics), when shown. */
+	translated?: string[] | null;
 }
 
 const STATUS_TEXT: Partial<Record<LyricsState["status"], string>> = {
@@ -35,7 +37,8 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
 	state,
 	activeIndex,
 	canSeek,
-	onSeek
+	onSeek,
+	translated
 }) => {
 	const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
 	const panelRef = useRef<HTMLDivElement>(null);
@@ -52,7 +55,7 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
 		const panelHeight = panelRef.current?.clientHeight || LYRICS_PANEL_HEIGHT;
 		const focus = beside ? FOCUS_POINT_BESIDE : FOCUS_POINT_BELOW;
 		setOffset(el.offsetTop + el.offsetHeight / 2 - panelHeight * focus);
-	}, [activeIndex, state.status, state.lines, beside]);
+	}, [activeIndex, state.status, state.lines, beside, translated]);
 
 	if (state.status === "synced") {
 		return (
@@ -82,6 +85,7 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
 								title={canSeek ? "Jump here" : undefined}
 							>
 								{line.text || "♪"}
+								{translated?.[i] && <div className="lyrics-line-translation">{translated[i]}</div>}
 							</div>
 						);
 					})}
@@ -101,6 +105,7 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
 				{state.plainText.split(/\r?\n/).map((line, i) => (
 					<div key={i} className="lyrics-plain-line">
 						{line || " "}
+						{translated?.[i] && <div className="lyrics-line-translation">{translated[i]}</div>}
 					</div>
 				))}
 			</div>

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
-import { useEffect, useState, useCallback, useRef, memo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -24,6 +24,8 @@ import { useActiveLyricIndex, useLyrics } from "./hooks/useLyrics";
 import { GlassLayer } from "./components/glass/GlassLayer";
 import { useGlassBackdrop } from "./hooks/useGlassBackdrop";
 import { useStoredSetting } from "./hooks/useStoredSetting";
+import { TranslateButton } from "./components/lyrics/TranslateButton";
+import { useLyricsTranslation } from "./components/lyrics/useLyricsTranslation";
 import { applyNotchFont } from "./fonts";
 import { getTimerChimeCtx, playTimerChime } from "./chime";
 import { PomodoroCompact, PomodoroView } from "./components/focus/PomodoroView";
@@ -921,6 +923,33 @@ function App() {
 		isPlaying
 	});
 	const spotifyLike = useSpotifyLike(mediaInfo.title, mediaInfo.has_media);
+	// Lyrics translation (one line under each lyric), toggled beside the
+	// lyrics button and remembered across songs.
+	const [lyricsTranslate, setLyricsTranslate] = useStoredSetting("bloom-lyrics-translate", "false");
+	const [lyricsTarget] = useStoredSetting("bloom-lyrics-translate-to", "es");
+	const lyricsSourceLines = useMemo(
+		() =>
+			lyrics.status === "synced"
+				? lyrics.lines.map((l) => l.text)
+				: lyrics.status === "plain"
+					? lyrics.plainText.split(/\r?\n/)
+					: [],
+		[lyrics]
+	);
+	const lyricsTranslation = useLyricsTranslation(
+		lyricsSourceLines,
+		lyricsOpen && lyricsTranslate === "true",
+		lyricsTarget
+	);
+	const translateButton =
+		lyricsOpen && lyricsSourceLines.length > 0 ? (
+			<TranslateButton
+				on={lyricsTranslate === "true"}
+				onToggle={() => setLyricsTranslate(lyricsTranslate === "true" ? "false" : "true")}
+				state={lyricsTranslation}
+				target={lyricsTarget}
+			/>
+		) : null;
 	const activeLyricText = activeLyricIndex >= 0 ? lyrics.lines[activeLyricIndex]?.text || "♪" : null;
 
 	// Weather hook
@@ -3125,6 +3154,7 @@ function App() {
 													like={mediaInfo.has_media ? spotifyLike : undefined}
 													lyricsOpen={lyricsOpen}
 													onToggleLyrics={toggleLyrics}
+													translateButton={translateButton}
 													mediaInfo={mediaInfo}
 													albumArtUrl={albumArtUrl}
 													albumArtKey={albumArtKey}
@@ -3233,6 +3263,7 @@ function App() {
 																		hint={spotifyLike.hint}
 																	/>
 																)}
+																{translateButton}
 																<button
 																	type="button"
 																	className={`lyrics-toggle-btn ${lyricsOpen ? "active" : ""}`}
@@ -3412,6 +3443,7 @@ function App() {
 													onSeek={(positionMs) => {
 														invoke("media_seek", { positionMs }).catch(() => {});
 													}}
+													translated={lyricsTranslation.status === "ready" ? lyricsTranslation.lines : null}
 												/>
 											)}
 										</motion.div>

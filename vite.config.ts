@@ -34,6 +34,11 @@ export default defineConfig(async () => ({
 		}
 	},
 
+	// The lock screen's depth worker imports ONNX Runtime as an ES module.
+	worker: {
+		format: "es"
+	},
+
 	// Multiple HTML entry points
 	build: {
 		rollupOptions: {

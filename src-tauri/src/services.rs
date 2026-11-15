@@ -934,6 +934,15 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
     });
 }
 
+/// Last media state sent to the windows, for windows that only listen while
+/// shown (the lock screen) so they can start from it.
+static LAST_MEDIA: std::sync::Mutex<Option<crate::types::MediaInfo>> = std::sync::Mutex::new(None);
+
+#[tauri::command]
+pub fn get_media_snapshot() -> Option<crate::types::MediaInfo> {
+    LAST_MEDIA.lock().ok().and_then(|m| m.clone())
+}
+
 /// Reads one string property of an audio endpoint.
 pub(crate) unsafe fn endpoint_string(
     store: &windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore,
@@ -1468,6 +1477,9 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                         (*pos - current.position_ms).abs() > 1000
                     }) {
                         let _ = handle_system.emit("media-update", current.clone());
+                        if let Ok(mut last) = LAST_MEDIA.lock() {
+                            *last = Some(current.clone());
+                        }
                         ANY_MEDIA_PLAYING.store(current.is_playing, Ordering::Relaxed);
                         last_emitted_info = Some((current.title, current.artist, current.is_playing, current.has_media, art_str, current.position_ms, current.duration_ms));
                     }

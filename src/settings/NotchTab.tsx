@@ -22,7 +22,9 @@ import {
 	Plane,
 	Radio,
 	Network,
-	Headphones
+	Headphones,
+	Languages,
+	Mail
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { useStoredSetting } from "../hooks/useStoredSetting";
@@ -143,6 +145,8 @@ export function NotchTab({
 	handleWidgetsChange
 }: NotchTabProps) {
 	const [lyricsLayout, setLyricsLayout] = useStoredSetting("bloom-lyrics-layout", "vertical");
+	const [translateTo, setTranslateTo] = useStoredSetting("bloom-lyrics-translate-to", "es");
+	const [translateEmail, setTranslateEmail] = useStoredSetting("bloom-translate-email", "");
 	const [pomodoroEnabled, setPomodoroEnabled] = useStoredSetting("bloom-pomodoro-enabled", "true");
 	const [tasksEnabled, setTasksEnabled] = useStoredSetting("bloom-tasks-enabled", "true");
 	const [clipboardHistory, setClipboardHistory] = useStoredSetting("bloom-clipboard-history", "true");
@@ -303,6 +307,41 @@ export function NotchTab({
 									Horizontal
 								</span>
 							</div>
+						</SettingRow>
+
+						<SettingRow
+							icon={Languages}
+							label="Translate Lyrics To"
+							desc="Language for the translate button next to the lyrics button"
+						>
+							<select
+								className="settings-select"
+								value={translateTo}
+								onChange={(e) => setTranslateTo(e.target.value)}
+							>
+								<option value="es">Español</option>
+								<option value="en">English</option>
+								<option value="pt">Português</option>
+								<option value="fr">Français</option>
+								<option value="de">Deutsch</option>
+								<option value="it">Italiano</option>
+							</select>
+						</SettingRow>
+
+						<SettingRow
+							icon={Mail}
+							label="Translation Email (optional)"
+							desc="Free translations allow ~5,000 characters a day (2–3 songs); an email raises it to 50,000. It's sent only to MyMemory."
+						>
+							<input
+								className="spotify-input"
+								type="email"
+								placeholder="you@example.com"
+								value={translateEmail}
+								onChange={(e) => setTranslateEmail(e.target.value.trim())}
+								spellCheck={false}
+								style={{ maxWidth: 190 }}
+							/>
 						</SettingRow>
 
 						<SettingRow

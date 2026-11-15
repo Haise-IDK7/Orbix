@@ -2030,6 +2030,7 @@ pub fn hide_native_osd() {
 #[tauri::command]
 pub fn open_settings_window(app: AppHandle) {
     if let Some(win) = app.get_webview_window("settings") {
+        crate::perf::set_low_memory(&win, false);
         let _ = win.show();
         let _ = win.unminimize();
         let _ = win.set_focus();

@@ -34,12 +34,14 @@ struct LrclibTrack {
     synced_lyrics: Option<String>,
 }
 
+const MAX_CACHED_SONGS: usize = 150;
+
 fn cache() -> &'static Mutex<HashMap<String, Option<LyricsResult>>> {
     static CACHE: OnceLock<Mutex<HashMap<String, Option<LyricsResult>>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn client() -> Result<&'static reqwest::Client, String> {
+pub(crate) fn client() -> Result<&'static reqwest::Client, String> {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
     if let Some(c) = CLIENT.get() {
         return Ok(c);
@@ -222,6 +224,10 @@ pub async fn fetch_lyrics(
         }
     }
     if let Ok(mut guard) = cache().lock() {
+        // A session rarely plays this many songs; start over rather than grow.
+        if guard.len() >= MAX_CACHED_SONGS {
+            guard.clear();
+        }
         guard.insert(key, found.clone());
     }
     Ok(found)

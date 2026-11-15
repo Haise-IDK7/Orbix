@@ -38,6 +38,12 @@
 - [x] Wi-Fi: physical-only Ethernet detection, SSID from connection profile, location checklist with auto re-check
 - [x] Bluetooth: paired device list, connect/disconnect audio (KS one-shot), Add device, connected name on tile
 
+### Round 5: battery, translation, sleep, memory
+- [x] Bluetooth battery % (Windows' device battery property) in list and tile
+- [x] Lyrics translation (MyMemory, batched, deduped, disk cache) with toggle beside the lyrics button
+- [x] Sleep: call SetSuspendState directly (rundll32 form hibernated); Modern Standby fallback
+- [x] Memory: WebView2 low memory target for hidden Settings/Lock screen, depth model in a throwaway worker, lock screen media only while shown, clipboard image cap 24 MB, lyrics cache cap, "Orbix is using X MB" in Performance
+
 ### Previous
 
 - [x] Task 1: Backend Non-Recursive Direct Folder Scanning (`src-tauri/src/wallpaper.rs`)

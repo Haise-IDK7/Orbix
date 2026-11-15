@@ -1,6 +1,9 @@
 ﻿import React, { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
+	BatteryFull,
+	BatteryLow,
+	BatteryMedium,
 	Bluetooth,
 	ChevronLeft,
 	ExternalLink,
@@ -24,6 +27,9 @@ interface BluetoothSubViewProps {
 const REFRESH_MS = 4000;
 /** Bluetooth audio needs a moment to (dis)connect before the state flips. */
 const SETTLE_MS = 2500;
+
+const batteryIcon = (level: number) =>
+	level <= 20 ? BatteryLow : level <= 60 ? BatteryMedium : BatteryFull;
 
 const KIND_ICONS: Record<string, typeof Bluetooth> = {
 	audio: Headphones,
@@ -93,6 +99,12 @@ export const BluetoothSubView: React.FC<BluetoothSubViewProps> = ({
 								: "Paired"}
 					</span>
 				</div>
+				{dev.connected && typeof dev.battery === "number" && (
+					<span className={`cc-bt-battery ${dev.battery <= 20 ? "low" : ""}`} title="Battery">
+						{React.createElement(batteryIcon(dev.battery), { size: 13 })}
+						{dev.battery}%
+					</span>
+				)}
 				{dev.can_toggle && (
 					<button
 						type="button"

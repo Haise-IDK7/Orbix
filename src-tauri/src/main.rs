@@ -9,11 +9,13 @@ mod lockscreen;
 mod lyrics;
 mod memory;
 mod package_icon;
+mod perf;
 mod power;
 mod services;
 mod shelf;
 mod spotify;
 mod state;
+mod translate;
 mod tray;
 mod types;
 mod updater;
@@ -252,6 +254,8 @@ fn main() {
             lockscreen::set_lock_curtain_skipped,
             lockscreen::get_lock_wallpaper,
             bluetooth::bluetooth_devices,
+            services::get_media_snapshot,
+            translate::translate_lyrics,
             bluetooth::bluetooth_set_connected,
             bluetooth::bluetooth_add_device
         ])
@@ -259,6 +263,7 @@ fn main() {
             init_taskbar_marker(app.handle());
             clipboard::start_monitor(app.handle().clone());
             lockscreen::start_idle_watch(app.handle().clone());
+            perf::start_memory_tuning(app.handle().clone());
             // Populate the settings cache before anything else: a webview can
             // invoke save_setting as soon as it loads, which happens before the
             // rest of this hook runs.

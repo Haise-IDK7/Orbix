@@ -116,6 +116,7 @@ pub fn show(app: &AppHandle, preview: bool) -> Result<(), String> {
             }
         }
     }
+    crate::perf::set_low_memory(&win, false);
     let _ = win.show();
     let _ = win.set_always_on_top(true);
     let _ = win.set_focus();

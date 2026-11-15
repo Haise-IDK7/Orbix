@@ -30,7 +30,8 @@ const CF_HDROP: u32 = 15;
 
 const MAX_ENTRIES: usize = 30;
 const MAX_TEXT_CHARS: usize = 200_000;
-const MAX_IMAGE_BYTES_TOTAL: usize = 48 * 1024 * 1024;
+/// Copied images are kept as PNG in memory; older ones drop off past this.
+const MAX_IMAGE_BYTES_TOTAL: usize = 24 * 1024 * 1024;
 const PREVIEW_CHARS: usize = 300;
 const THUMB_SIZE: u32 = 240;
 const POLL_MS: u64 = 400;

@@ -35,6 +35,8 @@ export interface MemoryReport {
 	available_mb: number;
 	used_percent: number;
 	top_apps: AppMemoryUsage[];
+	/** Orbix itself, including its WebView2 processes. */
+	orbix_mb?: number;
 }
 
 export interface OptimizeResult {
@@ -56,6 +58,8 @@ export interface BtDevice {
 	connected: boolean;
 	/** Orbix can connect/disconnect it (Bluetooth audio). */
 	can_toggle: boolean;
+	/** Battery %, when the device reports one (connected devices only). */
+	battery?: number | null;
 }
 
 export interface BtOverview {

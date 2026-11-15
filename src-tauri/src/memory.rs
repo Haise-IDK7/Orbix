@@ -66,6 +66,8 @@ pub struct MemoryReport {
     pub available_mb: u64,
     pub used_percent: u32,
     pub top_apps: Vec<AppMemoryUsage>,
+    /// Orbix itself, including the WebView2 processes that draw its windows.
+    pub orbix_mb: u64,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -161,6 +163,82 @@ fn working_set_bytes(handle: &OwnedHandle) -> u64 {
     }
 }
 
+/// Memory only this process uses (Task Manager's "Memory" column). Falls back
+/// to the working set on Windows builds without the private counter.
+fn private_working_set_bytes(handle: &OwnedHandle) -> u64 {
+    use windows::Win32::System::ProcessStatus::PROCESS_MEMORY_COUNTERS_EX2;
+    let mut counters = PROCESS_MEMORY_COUNTERS_EX2 {
+        cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX2>() as u32,
+        ..Default::default()
+    };
+    let ok = unsafe {
+        K32GetProcessMemoryInfo(
+            handle.0,
+            &mut counters as *mut PROCESS_MEMORY_COUNTERS_EX2 as *mut PROCESS_MEMORY_COUNTERS,
+            counters.cb,
+        )
+    }
+    .as_bool();
+    if ok && counters.PrivateWorkingSetSize > 0 {
+        counters.PrivateWorkingSetSize as u64
+    } else {
+        working_set_bytes(handle)
+    }
+}
+
+/// This process and every process it started, directly or not (WebView2's
+/// browser, renderer and GPU processes).
+fn own_process_tree(own_pid: u32) -> Vec<u32> {
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+    };
+    let mut pairs: Vec<(u32, u32)> = Vec::new();
+    unsafe {
+        let Ok(snapshot) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else {
+            return vec![own_pid];
+        };
+        let snapshot = OwnedHandle(snapshot);
+        let mut entry = PROCESSENTRY32W {
+            dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+            ..Default::default()
+        };
+        if Process32FirstW(snapshot.0, &mut entry).is_ok() {
+            loop {
+                pairs.push((entry.th32ProcessID, entry.th32ParentProcessID));
+                if Process32NextW(snapshot.0, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+    }
+    descendants(own_pid, &pairs)
+}
+
+/// `root` plus everything whose parent chain leads to it.
+fn descendants(root: u32, pairs: &[(u32, u32)]) -> Vec<u32> {
+    let mut family = vec![root];
+    let mut i = 0;
+    while i < family.len() {
+        let parent = family[i];
+        for &(pid, ppid) in pairs {
+            if ppid == parent && pid != 0 && !family.contains(&pid) {
+                family.push(pid);
+            }
+        }
+        i += 1;
+    }
+    family
+}
+
+fn orbix_memory_mb(own_pid: u32) -> u64 {
+    own_process_tree(own_pid)
+        .into_iter()
+        .filter_map(|pid| open(pid, PROCESS_QUERY_LIMITED_INFORMATION))
+        .map(|h| private_working_set_bytes(&h))
+        .sum::<u64>()
+        / MB
+}
+
 fn is_protected(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     PROTECTED.contains(&lower.as_str())
@@ -218,6 +296,7 @@ pub fn report() -> MemoryReport {
         available_mb,
         used_percent,
         top_apps,
+        orbix_mb: orbix_memory_mb(own_pid),
     }
 }
 
@@ -324,6 +403,15 @@ pub async fn close_heavy_app(name: String, force: bool) -> Result<CloseAppResult
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn collects_process_tree() {
+        // 10 = Orbix, 20 = WebView2 browser, 30/31 = renderers, 40 = unrelated.
+        let pairs = [(20, 10), (30, 20), (31, 20), (40, 1), (10, 5)];
+        let mut tree = descendants(10, &pairs);
+        tree.sort();
+        assert_eq!(tree, vec![10, 20, 30, 31]);
+    }
 
     #[test]
     fn aggregates_by_name_case_insensitively() {
